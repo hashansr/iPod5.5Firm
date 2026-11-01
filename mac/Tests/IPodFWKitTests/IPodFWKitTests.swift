@@ -2860,3 +2860,43 @@ final class AppLogTests: XCTestCase {
         XCTAssertEqual(AppLog.faultExcerpt(details: String(repeating: "x", count: 500), steps: []).count, 160)
     }
 }
+
+/// The list `keep_apple` of a theme: the pictures for which the theme keeps Apple's art.
+final class ThemeKeepAppleTests: XCTestCase {
+    private func theme() -> ImportedTheme {
+        var t = ImportedTheme(name: "t", source_sha256: "", osos_sha256: "")
+        t.changes = [ThemeChange(resource: "BMap 24342", offset: 0x100, old: Data([1]), new: Data([2]), oldSHA256: nil),
+                     ThemeChange(resource: "BMap 100", offset: 0x200, old: Data([1]), new: Data([2]), oldSHA256: nil)]
+        return t
+    }
+
+    func testDefaultListKeepsApplesProgressBar() {
+        XCTAssertEqual(theme().effectiveChanges.map(\.resource), ["BMap 100"])
+    }
+
+    func testEmptyListUsesTheProgressBarOfTheTheme() {
+        var t = theme()
+        t.keep_apple = []
+        XCTAssertEqual(t.effectiveChanges.map(\.resource), ["BMap 24342", "BMap 100"])
+    }
+
+    func testTheListSurvivesAWriteAndARead() throws {
+        var t = theme()
+        t.keep_apple = []
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("keep-\(UUID().uuidString).ipodtheme")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try t.write(to: url)
+        XCTAssertEqual(try ImportedTheme.load(url).keep_apple, [])
+    }
+
+    /// The built-in themes load, and Classic Dark uses its own progress bar and charging screen.
+    func testBuiltInThemes() throws {
+        let dir = PatchAndArtTests.repo.appendingPathComponent("themes")
+        let classic = try ImportedTheme.load(dir.appendingPathComponent("Classic Dark.ipodtheme"))
+        XCTAssertEqual(classic.keep_apple, [])
+        XCTAssertTrue(classic.changes.contains { $0.resource == "BMap 24342" })
+        XCTAssertTrue(classic.changes.contains { $0.resource.hasSuffix("(table entry)") })
+        let gray = try ImportedTheme.load(dir.appendingPathComponent("Dark Gray.ipodtheme"))
+        XCTAssertNil(gray.keep_apple)
+    }
+}

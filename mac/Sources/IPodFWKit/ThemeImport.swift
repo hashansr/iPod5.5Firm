@@ -123,8 +123,11 @@ public struct ImportedTheme: Codable, Equatable, Identifiable {
     public var changes: [ThemeChange] = []
     /// The pictures that the owner replaced in the dark theme.
     public var edits: [ThemeChange] = []
+    /// The resources for which the theme keeps Apple's art. nil: the default list `ThemeImport.keepApple`.
+    /// A theme with its own progress bar has an empty list.
+    public var keep_apple: [String]?
 
-    enum CodingKeys: String, CodingKey { case format, name, source_sha256, osos_sha256, imported, skipped, changes, edits }
+    enum CodingKeys: String, CodingKey { case format, name, source_sha256, osos_sha256, imported, skipped, changes, edits, keep_apple }
 
     public init(name: String, source_sha256: String, osos_sha256: String) {
         self.name = name
@@ -142,6 +145,7 @@ public struct ImportedTheme: Codable, Equatable, Identifiable {
         skipped = try c.decode([ThemeSkip].self, forKey: .skipped)
         changes = try c.decode([ThemeChange].self, forKey: .changes)
         edits = try c.decodeIfPresent([ThemeChange].self, forKey: .edits) ?? []   // not in files from earlier versions
+        keep_apple = try c.decodeIfPresent([String].self, forKey: .keep_apple)
     }
 
     public static func load(_ url: URL) throws -> ImportedTheme {
@@ -291,7 +295,8 @@ public struct ImportedTheme: Codable, Equatable, Identifiable {
     /// the edits of the owner in place of the theme changes in the same bytes.
     public var effectiveChanges: [ThemeChange] {
         var out: [ThemeChange] = []
-        for c in changes where ThemeImport.keepApple[c.resource] == nil {   // skip: a theme file from an earlier version
+        let keep = keep_apple ?? Array(ThemeImport.keepApple.keys)
+        for c in changes where !keep.contains(c.resource) {   // skip: a theme file from an earlier version
             if edits.contains(where: { c.offset < $0.offset + $0.new.count && $0.offset < c.offset + c.new.count }) { continue }
             let k = Self.keepHighlight(c)
             if k.old != k.new { out.append(k) }

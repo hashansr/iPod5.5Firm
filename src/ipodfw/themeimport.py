@@ -84,6 +84,9 @@ class Theme:
     skipped: list[tuple[str, str]] = field(default_factory=list)   # (resource, reason)
     imported: list[str] = field(default_factory=list)
     edits: list[Change] = field(default_factory=list)   # pictures that the owner replaced
+    # The resources for which the theme keeps Apple's art. None: the default list KEEP_APPLE.
+    # A theme with its own progress bar has an empty list.
+    keep_apple: list[str] | None = None
 
     def to_json(self, stripped: bool = False) -> str:
         """The theme as JSON. `stripped` writes format 2: each change holds the hash of the
@@ -109,6 +112,7 @@ class Theme:
             "skipped": [{"resource": r, "reason": why} for r, why in self.skipped],
             "changes": [one(c) for c in self.changes],
             "edits": [one(c) for c in self.edits],
+            **({"keep_apple": self.keep_apple} if self.keep_apple is not None else {}),
         }, indent=1) + "\n"
 
     @classmethod
@@ -124,14 +128,16 @@ class Theme:
                                   c.get("old_sha256", ""), c.get("copy", [])))
             return out
         return cls(d["name"], d["source_sha256"], d["osos_sha256"], changes(d["changes"]),
-                   [(s["resource"], s["reason"]) for s in d["skipped"]], d["imported"], changes(d.get("edits", [])))
+                   [(s["resource"], s["reason"]) for s in d["skipped"]], d["imported"], changes(d.get("edits", [])),
+                   d.get("keep_apple"))
 
     def effective_changes(self) -> list[Change]:
         """The changes to apply: without KEEP_APPLE, with Apple's highlight colours, and with the edits
         of the owner in place of the theme changes in the same bytes."""
         out = []
+        keep = KEEP_APPLE if self.keep_apple is None else self.keep_apple
         for c in self.changes:
-            if c.resource in KEEP_APPLE:            # a theme file from an earlier version
+            if c.resource in keep:            # a theme file from an earlier version
                 continue
             if any(c.offset < e.offset + len(e.new) and e.offset < c.offset + len(c.new) for e in self.edits):
                 continue
@@ -406,14 +412,15 @@ def _runs(pos: int, old: bytes, new: bytes, resource: str) -> list[Change]:
     return out
 
 
-def _smaller_picture(data: bytes) -> bytes:
-    """A 4-bit grey copy of an RGB565 picture if each pixel is grey (exact to 1/15), else data."""
+def _smaller_picture(data: bytes, grey_tolerance: int = 0) -> bytes:
+    """A 4-bit grey copy of an RGB565 picture if each pixel is grey (exact to 1/15), else data.
+    With grey_tolerance, a pixel is grey if its colour channels differ by at most this value."""
     pic = pictures.parse(data, 0)
     if pic is None or pic.depth != 16 or pic.texture_format == 0x1444:
         return data
     img = pictures.decode(data, pic)
     for r, g, b in img.get_flattened_data():
-        if not (r == g == b and abs(r - round(r / 17) * 17) <= 8):
+        if not (max(r, g, b) - min(r, g, b) <= grey_tolerance and abs(g - round(g / 17) * 17) <= 8):
             return data
     bpr = (pic.width + 1) // 2
     out = bytearray(struct.pack(pictures.HEADER_FMT, 4, 0, bpr, 4, bytes(8), pic.height, pic.width, bpr * pic.height))
@@ -422,13 +429,34 @@ def _smaller_picture(data: bytes) -> bytes:
     return bytes(out)
 
 
+def _moved_table_entry(t: "_Image", b: "_Image", n: "_Image", key, nkey) -> Change | None:
+    """The change of the table entry of a View that the theme points at other data in the same osos.
+    Gives None if the theme did not move the data of this View."""
+    tr_, br_, nr_ = t.res[key], b.res[key], n.res[nkey]
+    if not (tr_.table_pos == br_.table_pos == nr_.table_pos):
+        return None
+    if (tr_.offset, tr_.size) == (br_.offset, br_.size):
+        return None
+    old = n.osos[nr_.table_pos + 4:nr_.table_pos + 12]
+    new = struct.pack("<II", tr_.offset, tr_.size)
+    return Change(_label(nkey) + " (table entry)", nr_.table_pos + 4, old, new)
+
+
 def make_theme(theme_fw: FirmwarePartition, base_fw: FirmwarePartition, target_fw: FirmwarePartition,
-               name: str, source_sha256: str = "", free_area: tuple[int, int] | None = None) -> Theme:
+               name: str, source_sha256: str = "", free_area: tuple[int, int] | None = None,
+               own_progress_bar: bool = False, grey_tolerance: int = 0) -> Theme:
     """Make an iPodFirm theme for target_fw from an iPodWizard theme and the firmware that it came from.
 
     free_area is a range of the target osos for a picture that the theme made larger. The default
     is the space after the end of osos (where rsrc starts) to OSOS_LIMIT. To use it, the app moves
     rsrc (FirmwarePartition.make_room).
+
+    own_progress_bar keeps the progress bar pictures of the theme in place of Apple's pictures. Use it
+    for a theme that makes the bar visible on black. The theme then has an empty keep_apple list.
+    grey_tolerance lets a picture count as grey if its colour channels differ by at most this value.
+    Then a larger picture, for example the background, is stored as a 4-bit grey picture.
+    When the base and the target are the same osos, a View that the theme points at other data keeps
+    its new table entry (for example the charging screen of the Classic Dark theme).
     """
     t, b, n = _Image(theme_fw), _Image(base_fw), _Image(target_fw)
     if t.osos[:t.apple_len] == b.osos[:b.apple_len]:
@@ -437,7 +465,8 @@ def make_theme(theme_fw: FirmwarePartition, base_fw: FirmwarePartition, target_f
     if same < len(t.res) * 0.9:
         raise ThemeError("The base firmware is not the firmware that the theme came from.")
     first_t = min(bl.start for bl in t.blocks)
-    theme = Theme(name, source_sha256, _sha256(n.osos))
+    theme = Theme(name, source_sha256, _sha256(n.osos), keep_apple=[] if own_progress_bar else None)
+    same_layout = _sha256(n.osos) == _sha256(b.osos)
     if len(t.osos) == len(b.osos):
         code = sum(1 for x, y in zip(t.osos[:first_t], b.osos[:first_t]) if x != y)
         if code:
@@ -467,7 +496,7 @@ def make_theme(theme_fw: FirmwarePartition, base_fw: FirmwarePartition, target_f
         cur = n.data(nkey)
         pos = n.pos(nkey)
         label = _label(nkey)
-        if label in KEEP_APPLE:
+        if label in KEEP_APPLE and not own_progress_bar:
             theme.skipped.append((label, KEEP_APPLE[label]))
             continue
         changes: list[Change] = []
@@ -475,7 +504,7 @@ def make_theme(theme_fw: FirmwarePartition, base_fw: FirmwarePartition, target_f
             if len(new) == len(cur) and new[:28] == cur[:28]:
                 changes = _runs(pos, cur, new, label)
             elif len(new) != len(old):
-                blob = _smaller_picture(new)
+                blob = _smaller_picture(new, grey_tolerance)
                 at = (free[0] + 3) & ~3
                 if at + len(blob) > free[1]:
                     theme.skipped.append((label, "The picture is larger than the free space."))
@@ -494,7 +523,12 @@ def make_theme(theme_fw: FirmwarePartition, base_fw: FirmwarePartition, target_f
             try:
                 result, lost = merger.view(old, new, cur)
             except ThemeError as e:
-                theme.skipped.append((label, f"The import cannot use this View: {e}."))
+                entry = _moved_table_entry(t, b, n, key, nkey) if same_layout else None
+                if entry is None:
+                    theme.skipped.append((label, f"The import cannot use this View: {e}."))
+                    continue
+                theme.changes.append(entry)
+                theme.imported.append(label)
                 continue
             if lost:
                 theme.skipped.append((label, f"{lost} changed fields do not agree with the target firmware."))

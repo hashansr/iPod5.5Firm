@@ -689,7 +689,13 @@ final class AppModel: ObservableObject {
         return out.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
 
-    var selectedTheme: ThemeFile? { themes.first { $0.name == selectedThemeName } ?? themes.first }
+    /// The theme that the app selects if the owner selected none. Dark Gray is small enough for
+    /// "Switch on iPod". Classic Dark is not (refer to re/classic-dark.md).
+    static let defaultThemeName = "Dark Gray"
+
+    var selectedTheme: ThemeFile? {
+        themes.first { $0.name == selectedThemeName } ?? themes.first { $0.name == Self.defaultThemeName } ?? themes.first
+    }
 
     /// The dark-mode patch: not in the list of patches, because DarkMode.build adds it.
     static let darkModePatch = Patcher.list(in: AppModel.patchesDir).first { $0.spec.name == "dark-mode" }
