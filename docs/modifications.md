@@ -17,22 +17,13 @@ All addresses are osos offsets for Apple firmware 1.3. Refer to [The address rul
 | [flash-keep-awake](#flash-keep-awake) | Code patch | Patches | 4 `bl` | Version 1.1: yes (28 October 2026) |
 | [flash-wake-on-input](#flash-wake-on-input) | Code patch | Patches | 1 `bl` | Version 1.2: yes (28 October 2026) |
 | [volume-unlimit](#volume-unlimit) | Data patch | Patches | 2 bytes | No |
-| [search-5g](#search-5g) | Data patch | Patches | 1 byte | No |
 | [click-speaker-only](#click-speaker-only) | Data patch | Patches | 1 instruction word | Yes (2026-10-27) |
-| [no-now-playing-timer](#no-now-playing-timer) | Data patch | Patches | 1 byte | No |
 | [shuffle-fixes](#shuffle-fixes) | Code patch (extended) | Patches | 2 `bl` and 4 instruction words | Version 2.1: yes (28 October 2026) |
 | [shuffle-album-mix](#shuffle-album-mix) | Code patch (extended) | Patches | 3 `bl`, 3 `b` and 3 vtable words (all 6 with `chain`), 1 instruction word, 2 menus | Version 1.1: partly, the order of one album. Version 1.2: yes (28 October 2026) |
-| [something-comforting](#something-comforting) | Code patch (example) | Patches | 1 `b` and 2 vtable words (all with `chain`), a Settings menu | Version 1.1: yes (28 October 2026) |
 | [album-artists](#album-artists) | Code patch | Patches | 6 `b`, 4 `bl` and 3 vtable words (4 with `chain`), 3 menus | Version 1.1: yes. Version 1.2: the Main Menu setting is lost at a restart with Menu+Select. Version 1.3: yes (28 October 2026) |
-| [instant-save](#instant-save) | Code patch | Patches | 1 `b` | Version 1.0: yes (28 October 2026) |
 | [cover-flow](#cover-flow) | Code patch | Patches | 3 words (2 vtable slots and 1 literal) | Version 0.6.7: yes (27 October 2026). Version 0.6.8: yes (28 October 2026) |
 | [up-next](#up-next) | Code patch (extended) | Patches | 1 `bl`, 1 `b` and 2 vtable words (3 with `chain`), a Settings menu | Version 0.4: yes. Version 0.5: yes (28 October 2026) |
 | [custom-eq](#custom-eq) | Code patch (extended) | Patches | 1 `bl`, 1 `b`, 2 words (`bytes`) | Version 0.1: yes, a basic test by the owner. Version 0.2 and later: no |
-| [playlist-folders](#playlist-folders) | Code patch (extended) | Patches | 4 `bl`, 2 `b` and 1 vtable word (with `chain`) | Version 0.1: emulator only (29 October 2026). Not tested on the real iPod |
-| [playback-log](#playback-log) | Code patch (test, extended) | Patches | 8 `bl`, 5 `b` (all 5 with `chain`) | Version 1.0: yes (30 October 2026). Version 1.2: no. Not tested in the emulator |
-| [battery-log](#battery-log) | Code patch (test, extended) | Patches | 1 `bl` | Yes. Version 0.1 for 18.3 hours on a real iPod. Not tested in the emulator |
-| [diagnostic-log](#diagnostic-log) | Code patch (test, extended) | Patches | 12 `bl`, 8 `b` (all 8 with `chain`), 1 `word` (`chain`) | No. Not tested in the emulator |
-| [usb-host-probe](#usb-host-probe) | Code patch (test) | Patches | 8 `bl`, 2 `b` and 18 table words | Yes, as a test (2026-10-08). Version 1.29: yes (28 October 2026) |
 | [usb-audio-out](#usb-audio-out) | Code patch | Patches | 17 `bl`, 2 `b` and 4 words (3 with `chain`), a Settings menu | Yes (2026-10-17) |
 | [Dark theme](#dark-theme) | Resource data | Patches > iPod Appearance | BMap, View and Type bytes | Yes |
 | [Dark Mode switch](#dark-mode-switch) | Code and data | Patches > iPod Appearance | 1 `b` and 2 vtable words, a table and a menu | Version 1.1: yes (28 October 2026) |
@@ -498,98 +489,6 @@ Not tested: version 0.4 on the real iPod, a pop-up or a new screen while Cover F
 
 Real iPod 5.5G (owner, 25–27 October 2026, version 0.6.4, after a restore with iTunes and a new sync): Cover Flow operates, but it is very slow. The open takes several seconds, the frame rate is low, and one album step needs approximately two turns of the wheel. The log of version 0.6.5 showed the cause: the patch opened `F1029_1.ithmb` (416 MB, one image for each of 5201 tracks) for each cover, and each open took 1.1 s. Version 0.6.6 keeps the file open. The log of version 0.6.6 showed 1.1 s only at the open, 30 ms for each cover load and 69 ms for each frame. Word 3 of a wheel event counts the wheel ticks, so version 0.6.6 lost wheel steps. Version 0.6.7 counts the ticks and draws faster. Real iPod (27 October 2026), version 0.6.7: the owner reported that Cover Flow feels very fast. The wheel moves the covers, and a frame takes approximately 80 ms with a cover load. Version 0.6.8 removes the debug log and does not change the function. Real iPod (owner, 28 October 2026), version 0.6.8: Cover Flow operates.
 
-## usb-host-probe
-
-**User interface.** Patches pane > USB Host Probe, letter `h`. "Start the Probe at the Next Restart" writes '1' to `iPod_Control/iTunes/iPodFirmUSBProbe` and an empty 32768-byte `iPod_Control/iTunes/iPodFirmUSBLog` on the connected iPod. "Show USB Log" reads and decodes the log (`USBProbeLog` in [USBProbeLog.swift](../mac/Sources/IPodFWKit/USBProbeLog.swift)). The `ui` object of its `patch.json` gives the button, the section "Test Procedure" (the test steps) and the tool `usb-log` (the section "USB Log" with "Show USB Log" and "Copy Log"). This patch is a test for [USB-AUDIO-OUT.md](../USB-AUDIO-OUT.md) (Stage 0). It is on main since 2026-10-08.
-
-**Effect.** One time after the trigger, the iPod plays a demonstration of the signs and a countdown, starts its USB host stack, gives tones, and logs each call of a USB class driver. The next start is normal.
-
-**Load address.** `extended`: the build puts the code after all other data, for example after a theme and the Dark Mode items (refer to [patch-system.md](patch-system.md#the-extended-area)). The compiled code and data are 22248 bytes (version 1.28; version 1.28 changes only a note). The isochronous test takes 8 KB and 32 KB more from 0xad80c when it runs, and the music test 12 KB more. The log buffer (32712 bytes, 511 records) comes from the allocator 0x25a974 when the probe starts. The findings are in [patches/usb-host-probe/FINDINGS.md](../patches/usb-host-probe/FINDINGS.md).
-
-**Hooks.**
-
-| Kind | At | Expect | To | Original |
-|---|---|---|---|---|
-| `bl` | 0x1d8260 | 0xeb0000c2 | `hook_event` | `bl 0x1d8570` (long-push timer) in the UI event handler 0x1d81cc |
-| `bl` | 0x97364 | 0xeb073d0a | `hook_chip_check` | `bl 0x266794` (chip check, 0x598) in the UIM init 0x97300 |
-| `bl` | 0x9741c | 0xeb03cd13 | `hook_irq_install` | `bl 0x18a870` (install and enable the USB interrupt handler 0xffd1c) in the UIM init |
-| `bl` | 0x10c1d8 | 0xebff1d67 | `hook_add_device` | `bl 0xd377c` ("add device", the driver selection) |
-| `word` | 0x6c884c, 0x6c8850 | 0x000974ec, 0x0009762c | `hook_uim_interrupt_endpoint`, `hook_uim_interrupt_transfer` | UIM table: create interrupt endpoint, interrupt transfer (not logged for the root hub address) |
-| `b` | 0xcba54 | 0xe92d41f0 | `hook_interrupt_completion` | First instruction (`stmdb sp!, {r4-r8, lr}`) of the interrupt transfer completion callback (request, status, bytes). The wrapper continues at 0xcba58. At most 100 records. |
-| `b` | 0xcb118 | 0xe92d40fe | `hook_completion` | First instruction (`stmdb sp!, {r1-r7, lr}`) of the control transfer completion callback. The wrapper runs it and continues at 0xcb11c. |
-| `bl` | 0x9761c, 0x96d14 | 0xeb017997, 0xeb017bd9 | `hook_periodic_insert` | `bl 0xf5c80` (periodic insert). Fix of a firmware bug: the wrapper sets r1 = r0 (the new queue head). |
-| `bl` | 0x1320fc, 0x13217c | 0xeb046d05, 0xeb046ce5 | `hook_usb_send` | `bl 0x24d518` (send 12 isochronous packets on endpoint 0x81) in the USB audio stream loop 0x132038 |
-| `bl` | 0x13218c | 0x0b0468ce | `hook_usb_wait_if_sent` | `bleq 0x24c4cc` (wait for the endpoint). The hook is unconditional; the wrapper waits only if the last send returned 0. |
-| `bl` | 0x1321d0 | 0xeb0468bd | `hook_usb_wait` | `bl 0x24c4cc` after the stream loop |
-| `bl` | 0x170fc8 | 0xeb0370fd | `hook_device_start` | `bl 0x24d3c4` (the device mode start) in the device task loop 0x170f2c. Version 1.24: returns 1 while host mode runs. |
-| `bl` | 0xd399c, 0x10c204, 0xe2be0 | 0xeb0018d2, 0xebff36b8, 0xebffdc41 | `hook_usb_message` | `bl 0xd9cec` (the USB host message to the UI, for example "unsupported device"). Version 1.27: skipped while host mode runs. |
-| `bl` | 0x170fe0 | 0xeb03712d | `hook_device_stop` | `bl 0x24d49c` (the device session stop, a controller reset) in the device task loop. Version 1.24: skipped while host mode runs. |
-| `word` | 0x6c882c, 0x6c8830 | 0x00096f64, 0x00096ffc | `hook_uim_control_endpoint`, `hook_uim_control_transfer` | UIM table: create control endpoint, control transfer |
-| `bl` | 0xd28f0, 0x10e75c | 0xeb005422, 0xebff6487 | `hook_port_status` | `bl 0xe7980` (root port status) in the root hub GET_STATUS 0xd26b0 and in the status-change poll 0x10e6e0 |
-| `word` | 0x6c872c, 0x6c8730 | 0x000e7c40, 0x000e7bc4 | `hook_hub_validate`, `hook_hub_init` | Hub driver: validate, initialize device |
-| `word` | 0x6c85f0, 0x6c85f4, 0x6c85f8 | 0x00108b6c, 0x00108a24, 0x00110100 | `hook_composite_*` | Composite device driver (two records, one table) |
-| `word` | 0x6c8784, 0x6c8788, 0x6c878c | 0x00102194, 0x00102178, 0x0010dd00 | `hook_storage_*` | Storage driver |
-| `word` | 0x6c88dc, 0x6c88e0, 0x6c88e4 | 0x00113a78, 0x00118514, 0x001190a4 | `hook_ica_*` | ICA camera driver (Canon) |
-| `word` | 0x6c8934, 0x6c8938, 0x6c893c | 0x00110620, 0x001174d8, 0x00118b50 | `hook_ptp_*` | PTP camera driver |
-
-The dispatch tables are RW data. The start code copies them to RAM with the changes.
-
-**Runtime logic.**
-
-1. `hook_event` calls the original 0x1d8570. It acts only on events of type 4, 5 or 7 (button or wheel). Other event types also occur during the start, before the disk is ready.
-2. At the first such event, if the trigger file contains '1', it writes '0'. If the write is correct, it plays the demonstration (the hub sign, a pause, the storage sign, a pause), three short beeps and 2 s of silence, then calls the host start 0x2860e8. The pauses come from the task sleep 0x11c9fc, because the tone function 0xcd430 only puts a tone in the queue. The UI does not react for approximately 7 s.
-3. Each wrapper is `naked`. It saves r0–r3 and lr, calls `log_call` with the driver and entry number and the saved registers, restores them, and continues in the original function. Thus arguments on the stack stay correct.
-4. `log_call` adds a 64-byte record (r0–r3, 20 bytes at r1 and at r2 if they point into RAM) to a buffer of 63 records. It gives the hub sign for "hub: initialize device" and the storage sign for "storage: initialize interface".
-5. `hook_port_status` logs each change of the root port status (wPortStatus, wPortChange) with the raw PORTSC register, at most 24 records. The probe also logs the controller registers USBCMD, USBSTS, PORTSC and OTGSC after the host start and before each log write.
-6. While the probe runs, `hook_chip_check` returns 0. The UIM init then stores 1 at +0x60 of the controller object and sets PFSC (bit 24) in PORTSC at 0x9746c: the port runs at full speed. Emulator: r1 = 1 at 0x97460.
-7. The UIM wrappers log "create control endpoint" (address, endpoint, maximum packet size, speed) and each stage of a control transfer (setup with the 8-byte setup packet at r2, data, status with r2 = 0; the device address is the fifth argument, on the stack), at most 20 records. The queue record gives USBINTR, ASYNCLISTADDR, FRINDEX and 20 bytes of the first queue head and its qTD overlay (token at +0x18). The USB code gives buffer addresses in a window at 0x90000000. The log reads the same RAM through the normal window at 0x10000000 (the address minus 0x80000000), because a read in the 0x90000000 window stopped the probe on the real iPod (version 0.1.62).
-8. `hook_irq_install` replaces the install of the host interrupt handler. While the probe runs, it disables source 20, removes the device driver handler 0xcd8e0 (the sequence of 0x18a888: 0x127888, 0x1277d0), installs the host handler with 0x18a83c and enables the source (manager method +0x30). It logs the result of each step. The root hub transfers are not logged (address 0 before its control endpoint, and its own address).
-9. `hook_completion` logs each completion of a control transfer stage (request | stage bit, status, bytes, 40 bytes of the request block), at most 40 records, only for the request blocks of the last four logged device transfers (the root hub polls its port all the time, and each poll ends in a completion). 0xe01a0 calls the callback, possibly in the interrupt handler; the wrapper only writes RAM.
-10. Before and after the host start, the probe sets the byte at RAM 0x1083e0f8 (+0 of the USB global block) to 2. Then "add device" 0xd377c accepts external hubs. `hook_add_device` logs each call of "add device" with the device descriptor.
-11. Before each log write, the probe logs each queue head of the asynchronous list (from ASYNCLISTADDR, following the horizontal links) and each queue head in the periodic frame list (PERIODICLISTBASE 0xC5000154, size from USBCMD bits 3:2), at most 8 of each: endpoint characteristics, capabilities (S-mask, C-mask, hub, port) and the overlay token.
-12. With each queue dump, the probe also logs Apple's own periodic table for frames 0–7 (the UIM controller object at RAM 0x1084a778 + 0xc: +0x3c the processor address of the first queue head of each frame, +0x44 the frame list).
-13. `hook_periodic_insert` repairs a firmware bug. 0xf5c80 makes the frame list word from (r1 + 0x34) | 2, but both callers give the queue head only in r0 (0x974ec leaves r1 = the UIM controller object, 0x96c44 leaves r1 unset). Thus the frame list pointed to a block of zeros, and no interrupt endpoint was polled. The wrapper copies r0 to r1.
-14. Before the host start, the probe changes the second composite driver record (registry entry 0x6bc434, RAM 0x1084a360) from device class 2/0 to EF/02 (bytes at +0x35 and +0x36). It changes them only if they have the stock values. Then "add device" gives a device of class EF/02 (interface association, for example the USB-C EarPods) to the composite driver, and the driver reads the configuration.
-14a. Version 1.11: before the host start, the probe sets the storage driver record (registry entry 0x6bc460, RAM 0x1084a49c) +0x12 (interface class) and +0x35 (device class) from 8 to 0xff, if they have the stock values. No storage device gets a driver, thus the iPod does not enter the photo import state (a test for the album art of Now Playing).
-15. The probe follows each GET_DESCRIPTOR configuration request of a device (setup, data stage buffer). At the last completion (r0 with the stage bit), it writes the received bytes to the log in records of 40 bytes (tag 44, "Data"), at most 512 bytes. The app decodes the configuration descriptor: interfaces, endpoints, interface associations and the audio class descriptors.
-16. After the first log write, `audio_test` runs Stage 2 of [USB-AUDIO-OUT.md](../USB-AUDIO-OUT.md) (version 1.2):
-    1. At the completion of each GET_DESCRIPTOR configuration request, `find_audio` reads the received buffer (at most 512 bytes) and finds the first USB Audio Class 2 playback interface: 2 channels, 2-byte samples, an isochronous OUT endpoint of at least 192 bytes, and the clock source of the "USB streaming" input terminal. It keeps the device address of the request. Version 1.2 found it in the log records, which had old cache data (refer to item 21).
-    2. It gets memory from 0xad80c (the allocator of the UIM frame list and queue heads): one page for a control queue head, three qTDs, the setup packet and the tone buffer, and 1024 siTDs. It uses the memory only if the addresses are in the window 0x90000000–0x94000000.
-    3. It links its own control queue head after the queue head in ASYNCLISTADDR and sends SET_INTERFACE (alternate setting) and SET_CUR (48000 Hz to the clock source). The UI task polls the qTD tokens for at most 200 ms.
-    4. It puts one siTD before the old entry of each frame of the frame list (controller object +0x44, type siTD = 4). Each siTD sends 192 bytes (one period of a 1 kHz sine, 48 stereo samples, peak 4000) to the endpoint: OUT, hub 0, port 1, S-mask 0x03, 2 start splits, "begin". Before the siTDs start, the iPod gives one short high beep.
-    5. For 5 s, each 4 ms, it counts the executed siTDs (correct or an error) and makes them active again.
-    6. It sets the siTDs inactive, puts the old frame list entries back, sends SET_INTERFACE with alternate setting 0, and logs the result (tags 48–51). Then the probe writes the log.
-17. After the tone, `music_start` (version 1.4) sends the music of the iPod to the same device:
-    1. It sends SET_INTERFACE again and SET_CUR 44100 Hz (48000 Hz if the device refuses 44100).
-    2. It sets the USB audio state (RAM 0x108234ec): +1 = 0 (1000 packets each second), +8 = the rate. It sets the output rate of the converter of the USB source (0x1e2f60, the source object at RAM 0x10831964).
-    3. Version 1.9: it sends SET_CUR volume −20 dB (control 2, channels 1 and 2) to the unit before the output terminal that is not "USB streaming" (the EarPods: feature unit 2), on the audio control interface.
-    4. It puts its 1024 siTDs (inactive) into the frame list again and sets `music_mode`.
-    5. It sets the byte at RAM 0x1081dff6 to 1 (again at each send, version 1.5). Without an iAP "Digital Audio" accessory this byte is 0, and then 0x1e2f74 returns 0 and 0x1e3064 gives silence and never takes the decoder buffers (version 1.4: the song stayed at 0:00).
-    6. It does the steps of 0x132274 without the device endpoint: state + 2 = 1 (stream on), the event at state + 0x18 (0xd1e70) for USBAudioTask, the audio output object (RAM 0x108236a8) + 0x59 = 1, and 0x1a2fa0(output, 1). Then +0x5a = 1, and 0x1a2d60 gives the PCM buffers of the decoder to the USB source, not to the codec.
-    7. USBAudioTask (0xc75cc, 0x132038) takes 12 packets each time from 0x1e3064. `hook_usb_send` copies each packet, 12 dB lower (the digital route has no volume), into one of 64 buffers and arms the siTD of the next frame (one start split up to 188 bytes, else two). If the next frame is behind the controller, it starts 2 frames in front and counts an underrun. `hook_usb_wait` sleeps one time (0x11c9fc) for (frames in front − 24) ms. The emulator profile shows that this sleep blocks (the loop 0xa0be0/0xa69b4 takes less than 1.5 % of the CPU). Versions 1.7 and 1.8 waited on an event from the USB interrupt ("interrupt on complete" on the last siTD of each set); the iPod restarted after the tone in both. Version 1.9 copies whole 32-bit stereo frames, without the −12 dB shift (that loop took 19 % of the CPU in the emulator). Versions 1.5 and 1.6 used the sleep 0x11c9fc (1 ms many times, then one time each 12 ms), and the menus were very slow in both.
-    8. When `music_mode` is 0, the three hooks call the original functions. Thus the device mode (USB audio to an accessory) is unchanged. After a music stop, the hooks do nothing (the device functions would wait forever).
-    9. `music_stop` (version 1.7): when the root port loses its connection (`hook_port_status`) or after 200 siTD errors in a row, it sets the stream off, sets the siTDs inactive, puts the old frame list entries back, sets each siTD link to "end", gives the route back to the codec (+0x59 = 0, 0x1a2fa0, 0x1a2fa8) and signals the event. It logs tag 56.
-    10. Version 1.10: `idle_mark` logs the idle time of the CPU (tag 57) from the statistics of the idle routine 0xded04 (RAM 0x14983040: +0 and +8 the idle microseconds of the two cores, 64 bits). Phases: 1 the demonstration before the host start (the baseline), 2 the host mode until the first log, 3 the tone test, 4 the music start, 5 each music status.
-    11. Version 1.12 had a trace of ArtworkLoadTask (14 `bl` hooks in 0x205db4, tags 58–60) and a hook on the two calls of 0x1a3080 (tag 61). Version 1.13 removes them: the trace showed that the request queue of the task stays empty. The app still decodes these tags in old logs. The log writes after the start come at most each 5 s.
-    12. Version 1.14: `art_state` reads the gates of the art load (re/usb-host.md) and logs two records. It adds no hook. Tag 62: the art cache 0x1bfb74(0x10882b70, 0), its capacity + 0x74, + 0x78 and the bytes + 0x70 to + 0x72. Tag 63: the library open flag + 0x54, the request count, the photo import state (0x19a51c, 0x197e70) and the play queue (RAM 0x1081d9cc). The probe logs them before the host start, after the host start, in host mode, after the audio test and with each later log write. Version 1.15 adds tag 64: the count of the library queue (+0x14 list), the count of the art cache queue (+0x24 list), the count of the cache entries of the library (iterator 0x1e27e0 on +0x3c) and the byte +8 of the art cache entry. Version 1.16 adds tag 65: the ArtworkDB handle (database + 0xd2c and + 0xd14; the database is the app (RAM 0x1081da18) + 0x1c), the app reload flags + 0x484, + 0x489, + 0x48a and + 0x487, and the USB device state (RAM 0x108711d4 + 0x218). Version 1.17 adds tag 66: the first word of the ArtworkDB object (0x6974696c is correct), the count of its entries (list + 0xc), the byte + 6, the index + 0x620, and a test of the lookup 0x9a0f8 for the first entry (the list path, and the index path only if the index exists). Version 1.18 adds tag 67: the probe calls 0x205e64 (the art add step of the art task) for ArtworkDB entry 0 before the host start, entry 1 in host mode and entry 2 at the first later write, and logs + 0x78 and + 0xc before and after. Version 1.18 also had a third action, "Record the Art State Without USB Host" (trigger '3'): the same records without the host start, as a baseline (removed in 1.21). Version 1.19 does not call 0x19ff0c after a log write.
-    12a. Version 1.21 removes the art records (tags 62–67), the art test calls and the action "Record the Art State Without USB Host". The app still decodes the tags in old logs.
-    12b. Version 1.21, the volume: `volume_start` reads the UAC2 RANGE of the volume control (tag 68) and sets the volume from the iPod output volume (app + 0x40c, 0–256). `volume_poll` (in each wait of USBAudioTask) sends SET_CUR to channels 1 and 2 when the iPod volume changes, without a wait (`control_arm`, `control_check`; tag 69). The curve is 40·log10(v / 256) dB in version 1.21 (too loud) and −48 · (1 − v/256) dB since version 1.27, clamped to the range; v = 0 gives 0x8000 (silence). Versions 1.9–1.20 used a fixed −20 dB.
-    12c. Version 1.21, the buttons: `parse_hid` finds the HID interfaces of the configuration. `hid_start` reads their report descriptors (tag 70), finds the bits of the Consumer page usages (volume +, volume −, play/pause, next, previous) and links one periodic queue head for each interrupt IN endpoint (S-mask 0x04, C-mask 0x70, hub 0, port 1) after the siTD of each 8th frame. `hid_poll` (in each wait) logs each changed report with the decoded buttons (tag 71). `music_stop` unlinks the queue heads.
-    12d. Version 1.23, the buttons as iPod controls: at each push and release of a button, `buttons_changed` calls 0x1ac198 (code, down, 0), the key function of the front buttons and of the Simple Remote, with the remote key codes 0x20 (volume up), 0x1f (volume down) and 0x1c (play/pause) (tag 72). The UI task makes the key events, the repeats and the volume bar. Version 1.22 posted key events to the app target with 0x13d6d4; they did not reach the key handler.
-    12e. Version 1.24, the device task: before the host start, `device_handover` ends the device session with Apple's own stop (the abort flag at RAM 0x108318ec + 5, a wait of at most 2.5 s). While host mode runs, `hook_device_start` (0x170fc8) returns 1 and `hook_device_stop` (0x170fe0) skips the stop, so that the device mode does not take the controller (tag 74; a short high tone at a blocked start). While the probe runs, a computer does not see the iPod.
-    12f. Version 1.25, the reconnection: at each music stop the probe takes its control queue head out of the asynchronous ring (`control_unlink`), clears `audio_found` and resets the volume and button state. The first button press after the new enumeration starts the music route again (`hook_event`, UI task). The middle button of the headphones counts its pushes: one is play/pause (0x1c), two the next track (0x1e), three the previous track (0x1d), after 400 ms without a new push.
-    12g. Version 1.26, the stop at a disconnection: `hook_port_status` only sets `stop_request`; USBAudioTask stops the route at its next wait, between two sets of packets. If the player played (0x9ba00 = 1), the probe then sends the remote Pause key (0x3c). Tag 75 records the play state. The records of reports, keys and volume requests are limited to 40, 40 and 30.
-    12h. Version 1.27: while host mode runs, `hook_usb_message` does not show the USB host messages (error 0x68c "unsupported device" for the card slot and the billboard of the dock); that screen ended the playback at a reconnection. The volume curve is −48 · (1 − v/256) dB (half volume −24 dB); the test tone uses the iPod volume.
-    13. Version 1.12: the action "Start the Probe Without Music" writes '2' to the trigger file. Then the probe does not start the music route; the music stays on the headphone jack (a test for the album art).
-    14. `hook_event` returns after the music start, so that the owner can play a song. At a later button event, after 5000 more packets, it logs two records (tag 53: packets, underruns, packets with sound, the flags; tag 54: the decoder buffers for the codec and for USB, the queue indices, the flags 0x1081dff6 and 0x1081dff4, the rates; tag 55: the sleeps, the ms in the copy of the probe, the ms in Apple's packet fill (from the end of a wait to the next send), the ms since the music start; the microsecond timer 0x60005010) and writes the log. While the music test runs, the probe logs no other USB records (version 1.6). While the music test runs, the log writes do not dump the queue heads. Version 1.4 wrote the log at almost each wheel event, and the menus were slow.
-18. The probe no longer switches the periodic schedule off for 2 s (the "Experiment" of versions before 1.2).
-19. The last 96 records of the log (16 before version 1.8) are kept for the audio and music tests and the register records (version 1.3). In version 1.2 the log was full before the audio test.
-20. The limits are 200 UIM records, 200 completion records and 40 port records.
-21. The probe reads RAM only at addresses in 0x90000000–0x94000000 (the UIM memory, not in the cache, read directly since version 1.3) and 0x10000000–0x14000000 (the same RAM through the cache). Versions before 1.3 read a 0x9xxxxxxx address through 0x1xxxxxxx and sometimes got old cache lines.
-22. 10 s after the host start, `hook_event` writes the buffer to the log file and gives two short low beeps. 20 s later, it writes the log again, with two more beeps. The UI does not react during approximately 37 s. A later button or wheel event writes the log again if it has new records. A button event is not sufficient alone: 0x1d81cc gives each event to the active modal screen first (0x12d890, 0x12ddb8) and returns if the screen takes it, for example the photo import screen. On the real iPod, no log was written for this reason. Versions before 1.19 also called 0x1a0120 and 0x19ff0c after each write. 0x19ff0c is not a disk flush (refer to firmware-functions.md), and version 1.19 does not call it. The disk mode start writes the file data to the disk.
-
-**Test status.** Emulator: the demonstration and the countdown had the correct pauses. The host start ran 0x97300 and 0xd1288. The log had two records for the simulated root hub: hub validate and hub initialize device, device 05AC:8031, class 09, power 0xfa (500 mA). The menus worked after this. Real iPod: the host mode sign came. With the 3-in-1 adapter and a card reader, the photo import screen showed "unsupported device", with and without a card. No storage sign. With the dock, the port log showed VBUS valid, a connection, a correct reset and a high-speed device, but no driver call. The full-speed hook is for this result. Later tests (0.1.72–0.1.79) with the dock: the dock's hub, two storage devices and the USB-C EarPods enumerated. With the class change, the composite driver read the configuration of the EarPods (USB Audio Class 2). Caution: the probe reads DMA buffers through the cache, thus a second dump of the same buffer can show old bytes. Refer to [FINDINGS.md](../patches/usb-host-probe/FINDINGS.md). Version 1.2 (isochronous test), emulator: 0xad80c gave memory at 0x93B53000 and 0x93B4A740, the frame list was at 0x93B59000. The emulator has no asynchronous list, thus the control requests stopped at the guard. The 1024 siTDs were linked for 5 s and removed, and the menus worked after this. Real iPod, version 1.2 (2026-10-09): no tone, no audio record. The log was full (511 records), and the first 16 bytes of the EarPods configuration were old cache data. Version 1.3 corrects both. Real iPod, version 1.3 (2026-10-10): the owner heard the 1 kHz tone in the USB-C EarPods. 5105 frames correct, 0 errors; SET_INTERFACE and SET_CUR correct. Version 1.4 (music), emulator: the route switched to USB (+0x5a = 1), and USBAudioTask sent packets through the hooks. The emulator has no audio (a song stays at 0:00 also without the probe), thus the music data cannot be tested there. Real iPod, version 1.4 (2026-10-10): no music, the song stayed at 0:00, the menus were slow. The route and the stream operated (42 204 packets, 0 underruns), but the packets were silence. Cause: the byte 0x1081dff6 (item 17.4). Version 1.5, emulator: the queue indices move, packets with sound arrive, and the player goes to the next songs. Real iPod, version 1.5 (2026-10-10): **the music played through the USB-C EarPods**; the UI was very slow and the album art in Now Playing did not load. Real iPod, version 1.6: the sleeps were exact (14 924 ms requested, 14 991 ms passed), but the UI was still slow, the album art did not load, only 408 of 15 780 packets had sound, and a disconnection and connection of the dock froze the iPod. Version 1.7 blocks on the interrupt event and stops the music when the dock is disconnected. Emulator: the iPod starts and the menus work; USBAudioTask waits for an interrupt that the emulator does not give. Real iPod, versions 1.7 and 1.8: the iPod restarted (Apple logo) after the tone. Version 1.9 removes the interrupt path, copies 32-bit frames and sets the volume on the device. Real iPod, version 1.9: the UI still lags; the CPU record: probe copy 1.1 %, Apple's packet fill 2.8 % of 152 s; 0 underruns; the disconnection and connection of the dock still froze the iPod. Version 1.10 measures the idle time of the CPU in each phase. Emulator: idle 97.8 % in host mode, 97.6 % with the music route. Real iPod, version 1.10: scrolling is correct; the UI stutters only when the album art of Now Playing must show, and the art does not show (the log was reset by a new trigger, thus no idle records). Version 1.11 gives no driver to storage devices. Real iPod, version 1.11: the art still does not load. Idle of core 0: 96.8 % before the host start, 87.0 % in host mode, 57.0 % with the music route before the song, 26.6 % during the song (core 1 72.4 % later). Version 1.12 traces ArtworkLoadTask. Emulator: the trace records come (the wait, the gate granted, the release; no art in the emulator library), and the menus work. Real iPod, version 1.12: the art also does not load when the probe is installed but not started; it loads without the probe; the margin setting does not change it. Version 1.13 removes the trace hooks (the same hook set as 1.11). Emulator: the probe installed and not started: the iPod starts, Now Playing opens. Real iPod, version 1.13 not started: the Now Playing art loads. With the probe started: the art is missing (the owner, version 1.13). Version 1.14 (2026-10-15): in each record the art cache list is empty (+0x78 = 0, +0xc = 0), also when a song plays; the capacity is 0x100000, the library is open, and the photo import state is 1 also before the host start. Version 1.15 (2026-10-15): both request queues are empty, the art cache entry is enabled, and the task runs; thus the art lookup 0x205e64 finds no art. Version 1.16 (2026-10-15): the ArtworkDB handle stays set (0x13df3670) before and after the host start, and no database reload occurs. Version 1.17 (2026-10-15): the ArtworkDB object is correct (first word 0x6974696c, 5218 entries, index set), and the lookup 0x9a0f8 finds the first entry through the list and the index, before and after the host start. Version 1.18 baseline without the host start (2026-10-15): the art is also missing; the test calls of 0x205e64 add the art formats (+ 0x78 0 → 1 → 2 → 3), but the playing song is not added. Thus the cause is not the host mode. Version 1.19 removes the call of 0x19ff0c after each log write. Real iPod, version 1.19 baseline (2026-10-15): **the Now Playing art loads**; + 0x78 grows from 3 to 6 and 8 while songs play. Thus the calls of 0x19ff0c were the cause. Real iPod, version 1.19 in host mode ("Start the Probe Without Music"): **the art loads**; + 0x78 grows from 3 to 7 and 10. A connection to the Mac while host mode runs froze the iPod. Version 1.20 changes only the test steps: wait 15 s after the last button press, then restart the iPod before the connection to the Mac. Real iPod, version 1.20 with the music route (2026-10-15): **the music plays through the USB-C EarPods and the Now Playing art loads**; 80 436 packets (80 s), 0 underruns; + 0x78 grows to 8; the probe copy 1.0 % and Apple's packet fill 2.7 % of the time. Real iPod, version 1.21 (2026-10-16): **the EarPods volume follows the click wheel**, with no gaps; all SET_CUR requests correct; the button reports decode correctly. Real iPod, version 1.22: the buttons did not operate the iPod (the posts did not reach the key handler). Real iPod, version 1.23 (2026-10-16): **all EarPods buttons operate the iPod as expected** (volume +, volume −, play/pause); 0 underruns. Real iPod, version 1.24 (2026-10-16): **no freeze** at a new connection of the dock or of the Mac; the headphones did not operate after the reconnection (the route started only one time). Real iPod, version 1.25: **the headphones operate again after the reconnection**; two and three pushes operate well; the playback stopped completely at the disconnection. Real iPod, version 1.26: **the song pauses at the disconnection**; the headphones start too loud; at the reconnection "unsupported device" ended the playback. Real iPod, version 1.27 (2026-10-16): **all as expected**: no "unsupported device" at a reconnection, the song continues after Play, and the volume levels are good. Real iPod 5.5G (owner, 28 October 2026), version 1.29: the probe operates.
-
 ## usb-audio-out
 
 **Effect.** Settings has the item "USB-C Audio" (On/Off) after Clicker. Off is the default after each start: the USB port operates as usual (sync, disk mode, charging). On: the iPod operates as the USB host and plays its music through USB Audio Class 2 headphones (for example the Apple USB-C EarPods) through a USB-C dock or OTG adapter with power. The click wheel sets the volume of the headphones. The buttons of the headphones operate the iPod: volume + and −; the middle button one time is play/pause, two times the next song, three times the previous song. A disconnection pauses the song, and after a new connection the music goes to the headphones again. Off gives the port back to the device mode at once. Since version 1.3, Settings > Main Menu has a USB-C Audio row after Sleep. On puts the item "USB-C Audio: Off" in the main menu, after Settings. The default is Off. A selection of the item switches USB-C Audio On or Off. The item shows the state: Off, On, 44.1 kHz or 48 kHz.
@@ -678,35 +577,6 @@ Thus `0xa0348` always returns 0. The other match of the iPodWizard pattern, at 0
 
 **Test status.** A script applied the change to osos 1.3 and ran the iPodWizard search: "capped" before, "uncapped" after. The emulator cannot show the effect. Not tested on a real iPod. The test needs an iPod for the EU.
 
-
-## search-5g
-
-**User interface.** Patches pane > Display > Search on the 5G, letter `e`, version 1.1.
-
-**Effect.** On a 5G, Music > Search is the last item of the Music menu, and Settings > Main Menu has a Search item. On a 5.5G, the patch changes nothing, because the 5.5G already shows Search.
-
-**Research.** Refer to [re/search-5g.md](../re/search-5g.md). The idea and the byte come from RetroCux.
-
-- `0x130b30` returns 0 if the hardware revision is model 0xb with a revision below 0x11 (the 5G).
-- Only two callers use it: the Search bit of the main menu (`0x105a04`, label 0x5f8b) and the Music menu (`0x130ca4`).
-
-**Change.** This patch has no C code. It uses the `bytes` key of `patch.json`:
-
-| At | Expect | Value | Instruction after the change |
-|---|---|---|---|
-| 0x130b50 | `00` | `01` | `movcc r0, #1` |
-
-Thus `0x130b30` always returns 1. The size on the iPod is 0 bytes. The pane shows "1 byte".
-
-**Test status.** The Apple osos 1.3 has `00` at 0x130b50. Not tested in the emulator: the emulator profile is a 5.5G. Not tested on a real iPod with iPodFirm. RetroCux tested the same byte on a real 5G.
-
-## no-now-playing-timer
-
-**User interface.** Patches pane > Display > No Now Playing Timer, letter `t`, version 0.2. A change of the layout to Split turns the patch on one time. The patch keeps its own switch, and a change to Stock does not change it.
-
-This patch stops the timer that opens Now Playing after 10 seconds with no input. It changes 1 byte of the `TCmd` 9088 script, at osos 0x4b5e38: 0x07 in place of 0x96. The function 0xf84 then calls 0x1007, which starts the timer again, and does not call 0x1096, which opens Now Playing. Play on a song and the Now Playing menu item do not change. Refer to [../re/now-playing-open.md](../re/now-playing-open.md).
-
-**Test status.** Emulator: the owner tested version 0.1 with the Split themes (31 October 2026) and reported that it works well. Real iPod: not tested.
 
 ## click-speaker-only
 
@@ -820,35 +690,6 @@ The setter 0xb3a04 does nothing for a change between Albums and Album Mix, becau
 
 **Test status.** Emulator (20 October 2026, with `shuffle-fixes` and the fixed seed, 60 tracks): Select on Shuffle gives Off → Songs → Albums → Album Mix → Off, and the bytes `+0x20`, `+0x92` and `+0x93` agree with each value. In Album Mix, Shuffle Songs played Test Song 43 first, as the model. The Repeat row stays correct. With all 13 patches that are not `internal` or `test` (20 October 2026): the firmware starts, Music has Album Artists, Settings shows Album Mix, Repeat Off, USB-C Audio Off and Something Comforting Play, and Album Mix gives the same order as the model. Real iPod (20 October 2026): the owner played one album with Album Mix on. The songs of the album played in a random order. With Repeat All, the album plays with no end, and the songs stay shuffled. Not tested yet: a list with many albums, and if each pass has a new order. Version 1.2, emulator (22 October 2026, with `shuffle-fixes`, 60 tracks; again with `album-artists` and `usb-audio-out`): the item is hidden by default. Settings > Main Menu > Shuffle = On shows "Shuffle: Off" after Shuffle Songs. Select gives Songs → Albums → Album Mix → Off. Settings > Shuffle then shows the same value. Select on Settings > Shuffle changes the main menu item too. Shuffle Songs still starts the music with shuffle on. Real iPod 5.5G (owner, 28 October 2026), version 1.2: the patch operates.
 
-## something-comforting
-
-**User interface.** Patches pane > Fun > Something Comforting, letter `m`. The section "Play the Melody" gives the steps on the iPod. This patch is an example of a patch that adds a Settings item and that shares its hooks with other patches.
-
-**Effect.** Settings has a Something Comforting item after Clicker. Its value text is "Play". When the owner selects the item, the piezo plays a part of "Something Comforting" by Porter Robinson: the synth lead, bars 41–48, approximately 13 s. The UI does not react while the melody plays. The Clicker setting does not stop the melody.
-
-**Load address.** `extended`. The compiled code and data are 692 bytes (alone: 0x736800–0x736ab4). After the code, the patcher writes the Settings menu with 19 items (764 bytes; alone at 0x737000). The osos then ends at 0x737800.
-
-**Settings item.** Key 0x600060e4, label ID 0x7e01, after Clicker (0x60006088), a copy of Sound Check (`settings_items`, refer to [patch-system.md](patch-system.md#settings-items)). The key 0x600060e4 is not a 32-bit word anywhere in osos 1.3. Ghidra found no use of 0x7e01 and 0x7e02.
-
-**Hooks.** All three hooks have `chain`. With "Switch on iPod", they replace the Dark Mode hooks and call them for all other keys and IDs.
-
-| Kind | At | Expect | To | Chain |
-|---|---|---|---|---|
-| `b` | 0x21f254 | 0xe92d40f8 | `hook_lookup` | `lookup_next`; default `lookup_original` (`push {r3-r7, lr}`, then 0x21f258) |
-| `word` | 0x66c94c | 0x00190b00 | `hook_settings_get` | `get_next` |
-| `word` | 0x66c950 | 0x001919d8 | `hook_settings_set` | `set_next` |
-
-**Runtime logic.**
-
-1. `hook_lookup` returns "Something Comforting" for 'Str ' 0x7e01 and "Play" for 'Str ' 0x7e02. For all other lookups, it calls `lookup_next`.
-2. `hook_settings_get` gives the value text ID 0x7e02 ('prID') or the text "Play" ('Str ') for the key 0x60e4.
-3. `hook_settings_set` plays the melody for the key 0x60e4. For each entry of the note table, it calls `tone` (0xcd430) with the period and the duration. Then it waits with the task sleep 0x11c9fc until the start of the next entry. The time comes from `USEC_TIMER` (0x60005010).
-4. A rest is only a wait: when a note ends and the queue is empty, the piezo task stops the piezo (refer to [re/piezo.md](../re/piezo.md)).
-
-**Note table.** [re/midi-to-tones.py](../re/midi-to-tones.py) makes the table from a MIDI file: track 6 (Flute), bars 41–48, the highest note at each time. 74 entries (37 notes), 12912 ms. The MIDI file is not in the repository.
-
-**Test status.** Emulator (2026-10-08): the Settings menu showed "Something Comforting" with "Play" after Clicker. Select called the set hook one time and `tone` 37 times for the notes. The times between the notes agreed with the table within approximately 10 ms. The menus worked after the melody. The emulator has no audio. Real iPod 5.5G (owner, 28 October 2026, version 1.1): the patch operates.
-
 ## album-artists
 
 **User interface.** Patches pane > Display > Album Artists, letter `l`. The section "Use the Album Artists List" gives the steps on the iPod. The design comes from osos-lab (RepriseOS) for the iPod Classic. The research is in [re/album-artist.md](../re/album-artist.md#album-artists-menu-item-15-october-2026).
@@ -934,32 +775,6 @@ Real iPod (owner, 16 October 2026), version 1.2: after Settings > Main Menu > Al
 
 Real iPod 5.5G (owner, 28 October 2026), version 1.3: the patch operates.
 
-## instant-save
-
-**User interface.** Patches pane > Power > Instant Save, letter `i`. The section "Test the Save" gives the steps on the iPod.
-
-**Effect.** The iPod writes its settings at once when the owner changes a row in Settings > Main Menu. This includes the Album Artists row of [album-artists](#album-artists). The other settings (for example Shuffle and Repeat) still save only at a sleep.
-
-**Cause.** The setter 0x19351c changes the main menu mask and sets the byte "changed" (settings data + 0xb74). The firmware writes the settings only at a sleep (0x1ee8d0) or at a save of all data (0xbc094, for example at a disk change). A restart with Menu+Select runs no save. Refer to [re/album-artist.md](../re/album-artist.md#the-save-of-the-settings-real-ipod-16-october-2026).
-
-**Load address.** `extended`. The compiled code is 36 bytes (alone: 0x736800–0x736824). In a build with other patches, it starts directly after the patch before it (16-byte steps), thus it adds approximately 36 bytes.
-
-**Hooks.**
-
-| Kind | At | Expect | To |
-|---|---|---|---|
-| `b` | 0x19351c | 0xe92d41f0 | `hook_set`; wrapper `set_original` (`push {r4-r8, lr}`, then 0x193520) |
-
-**Runtime logic.**
-
-1. The firmware rows (0x192794) and the Album Artists row of `album-artists` call the setter 0x19351c.
-2. `hook_set` runs the original setter, then calls 0xbbf1c with the settings data ((settings + 0x98) + 0xca0).
-3. 0xbbf1c writes the settings only if the byte "changed" is set. Thus a selection that changes nothing writes nothing.
-
-**Limits.** Each change writes the settings file. On an iPod with a hard drive, the drive can start.
-
-**Test status.** Emulator (2026-10-16), with `album-artists`: a change of the Songs row and of the Album Artists row each ran 0xbbf1c and the write 0xbbdf8 one time. A change of Playlists gave the ATA commands WRITE DMA (0xca) and READ DMA (0xc8). The emulator keeps no settings after a cold start, thus the result after a restart is not tested in the emulator. Real iPod 5.5G (owner, 28 October 2026, version 1.0): the patch operates.
-
 ## up-next
 
 **User interface.** Patches pane > Playback > Up Next, letter `n`, version 0.6. The option "Hold Select" gives the value that the iPod uses before the first change in Settings: Cover Flow (default), Play Next, Play Last or On-The-Go. Without the Cover Flow patch, the value Cover Flow acts as Play Next. On the iPod: Settings > Hold Select, after Clicker. Each push of Select moves to the next value. The research is in [../re/play-next.md](../re/play-next.md).
@@ -1032,135 +847,6 @@ Each active band of each EQ gets the next filter number (`CustomEQ.library`). 5 
 **Move from an older version.** At the first start, the app moves the bands from `patchOptions` to the EQ "Custom" in `customEQs`. A firmware list from an older version gives the same EQ.
 
 **Test status.** Emulator, version 0.7 (31 October 2026): the firmware starts with 14 EQs and 42 filters, and the list in memory has all the names in sorted sequence with correct values, to filter 96. Version 0.9 repeats the test with 5 EQs and 25 filters. The owner reports that multiple EQs operate (version 0.7, 31 October 2026). The report does not say if an EQ above filter 59 was selected. Emulator, version 0.1 (31 October 2026): the firmware starts, and the list has "Custom" between "Classical" and "Dance" with the value 5500 for one band. Real iPod, version 0.1 (the owner, 31 October 2026): the patch operates. The precut made the music quieter. The band settings are not recorded. App, version 0.4 (the owner, 31 October 2026): export and import, a double-click on the file, and the rejection of a damaged file operate. Version 0.2, the CPU load with 5 bands and USB-C audio are not tested on the real iPod.
-
-## playlist-folders
-
-**User interface.** Patches pane > Display > Playlist Folders, letter `o`, version 0.6. The section "Playlist Folders" of the patch is the editor (`ui.tools`: `playlist-folders`, `PlaylistFoldersSection` in [PatchTools.swift](../mac/Sources/iPodFirm/PatchTools.swift)). It has these controls:
-
-- "Folder position": Folders First or Alphabetical.
-- "Folder Icons": a switch for the folder icon of all folders. The default is on. The switch always shows. It operates only if the connected iPod has folders, because the folder file on the iPod keeps the value.
-- One row for each folder: the name, the count of playlists and a delete button. Open the row to put playlists into the folder. A playlist is in one folder only.
-- "Add Folder" and "Write Folders to iPod".
-
-The app does not write the folders if a folder has no name, a name of more than 63 characters, the name of a playlist or the name of a different folder. The research is in [../re/playlist-folders.md](../re/playlist-folders.md).
-
-**Effect.** The Playlists list shows the folders and the playlists that are not in a folder. Select on a folder shows its playlists on the same screen. Menu goes back to the top list, with the folder selected. A folder cannot contain a folder. There is no slide animation, and the title stays "Playlists". A folder without playlists on the iPod does not show. On-The-Go stays in the top list.
-
-**The file.** The app writes `iPod_Control/iTunes/iPodFirmPlaylistFolders` (`PlaylistFolders` in [PlaylistFolders.swift](../mac/Sources/IPodFWKit/PlaylistFolders.swift)). The app removes the file if there are no folders. All values are little-endian, and each part starts at a multiple of 4 bytes:
-
-| Part | Content |
-|---|---|
-| Header, 12 bytes | `IFPF`, u16 version (1), u16 flags (bit 0: alphabetical; bit 1: no folder icons), u16 folder count, u16 0 |
-| Each folder | u16 colour (RGB565), u16 name units, u16 member count, u16 0, the name (UTF-16, padded to 4 bytes), the members (u64 each) |
-
-A member is the persistent ID of a playlist (`mhyp` +0x1c). The firmware keeps it at playlist + 0x18. A persistent ID does not change when the playlist gets a new name. The patch reads at most 64 folders and 64 KB.
-
-**The folder icon.** If `album-art` 3.4 or later is installed, each folder row shows a 20 × 20 blue folder icon. The switch "Folder Icons" in the section "Playlist Folders" sets the icon on or off for all folders (`album-art` 3.5, bit 1 of the flags in the folder file). The default is on. `album-art` draws the icon, and `playlist-folders` has no icon code. Without `album-art`, a folder row has only text. Refer to [../re/playlist-folders.md](../re/playlist-folders.md#folder-icon).
-
-**The colour.** The firmware does not use the colour. Version 0.2 of the app does not show the colour picker and does not write colour squares. The colour squares did not show on the real iPod. The code stays in the app as comments, for later work. Refer to [../re/playlist-folders.md](../re/playlist-folders.md#folder-colours). The file keeps the colour field. The app writes the default colour into it.
-
-**Load address.** `extended`. The compiled code and data are 3980 bytes. The patch also uses heap memory: 64 KB for the file buffer, 24 bytes for each folder (version 0.6), and small arrays for the views.
-
-**Hooks.**
-
-| Kind | At | Expect | To |
-|---|---|---|---|
-| `bl` | 0x1ea66c | 0xebface65 | `hook_count`: the count in 0x1ea660 (0x9e008). The count of the view + 1. |
-| `bl` | 0x1ec914 | 0xebfac19d | `hook_name`: the name of row + 1 (0x9cf90) for the label 0x6425. A folder gives its name. |
-| `bl` | 0x1e7e7c | 0xebfb2acb | `hook_select`: the selection 0xb29b0 in 0x1e7e34. |
-| `bl` | 0x254cc4 | 0xebf93b3e | `hook_otg`: the On-The-Go test 0xa39c4 in 0x254cac. 0 for a folder. |
-| `b` | 0x1ea660 | 0xe92d4010 | `hook_vmax`: keeps the JS browser of the screen; wrapper `vmax_original` (`push {r4, lr}`, then 0x1ea664) |
-| `word` | 0x6772c0 | 0x0023b704 | `hook_list_event` (`chain`: `list_event`): the event method of the browse lists |
-| `b` | 0x1d81cc | 0xe92d41f0 | `hook_ui_event`: the UI handler; wrapper `ui_original` (`push {r4-r8, lr}`, then 0x1d81d0) |
-
-The patch does not change the slot 0x6701f0 of the UI handler: [cover-flow](#cover-flow) hooks that slot, and [up-next](#up-next) reads it. With cover-flow, the hook of cover-flow calls 0x1d81cc, and 0x1d81cc goes to `hook_ui_event`.
-
-**Runtime logic.**
-
-1. The Playlists screen shows array entry row + 1 of the playlist array (main browser + 0xcfc, count + 0xd00). Only the four `bl` hooks change a screen row into an array index.
-2. At each hook call, `ensure` makes a checksum of the array (the pointers and the persistent IDs). If the array changed, it reads the file again and makes the views: the top list and the playlists of each folder, in the order of the array. A view item is an array index, or 0x8000 + a folder number.
-3. Folders First: the folders in the file order, then the playlists that are not in a folder. Alphabetical: before each playlist, the folders with a smaller name, in name order (a–z without case). On-The-Go stays last.
-4. Select on a folder row (`hook_list_event`, key 0x6f): the view changes to the folder. The patch calls 0x1ea660 again (it sends 'VMax'), sends `'Str '` for element 0x6387, sets the selection to row 0 (vtable +0x138) and calls 0x21ac04. It keeps the push.
-5. Menu in a folder (key 0x6e): the view changes to the top list, with the folder row selected. The patch keeps the push.
-6. `hook_ui_event` stops the rest of a push that the patch kept (types 5–7) and decreases the byte UI + 0x44 at the release. Without this, the firmware does the action of the key a second time.
-7. Menu in the top list: the patch reads the file again at the next open.
-
-**Limits.** The title of a folder is "Playlists". There is no slide animation: a second Playlists screen did not operate (refer to the research, experiments 4 and 5). An accessory (iPod Accessory Protocol, for example a car) does not see the folders. A playlist in a folder plays and shuffles as before.
-
-**Test status.** Emulator (29 October 2026, the owner in the emulator window, version 0.1): Folders First and Alphabetical, Select on a folder, a playlist in a folder, Menu back to the folder and to the top list, the next open of Playlists, and the colour squares with `album-art`. All passed. Real iPod (the owner, 29 October 2026), version 0.1: the folders operate. The colour squares did not show.
-
-## playback-log
-
-**User interface.** Patches pane > Playback Log, letter `g`. It is a test patch: turn on **Enable Test Patches** to see it. "Clear the Playback Log" writes an empty 32768-byte `iPod_Control/iTunes/iPodFirmPlaybackLog` on the connected iPod. The tool `playback-log` gives the section "Playback Log" with "Show Playback Log", "Copy Log", "Save the Log to Share…" and "Report on GitHub…" (`PlaybackLog` in [PlaybackLog.swift](../mac/Sources/IPodFWKit/PlaybackLog.swift), `AppModel.readPlaybackLog`, `savePlaybackLog`, `reportPlaybackLog`). "Save the Log to Share…" writes the log as a `.txt` file (default name "iPodFirm Playback Log yyyy-MM-dd HHmm.txt") and shows it in Finder. "Report on GitHub…" also saves the file, then opens a new issue in the browser with a title and a body (the app version and the information lines of the log). The user drags the file into the issue. This needs a GitHub account. Without an account, send the saved file in a different way.
-
-**Effect.** The iPod records each shuffle, each change of the song, each song that cannot play, each stop for "no next song" and each failed memory allocation. A button or wheel event writes the log to the file, at most one time each 5 seconds. The log starts with the RAM size, the free memory, the lowest free memory, the settings and the iPodFirm list of the build. The settings are Shuffle, Repeat and Hold Select (`up-next`). A changed setting also gives a line in the log. The app shows the patches of the list with their letters and options. `song=` is the low 32 bits of the dbid of the track (track + 0x108, mhit + 0x70). The app finds each song in the iTunesDB of the connected iPod. It shows the title and the artist in the line, and a list of the songs with the album and the file at the end. The saved file has these names, so the user must know this before they attach the file to a public issue.
-
-**Research.** Refer to [re/playback-log.md](../re/playback-log.md).
-
-**Load address.** `extended`. The code, the data and the 32 KB log buffer (`.bss`) are 38849 bytes. The buffer is in the patch, thus the log operates also when the heap is full.
-
-**Hooks.**
-
-| Kind | At | Expect | To | Original |
-|---|---|---|---|---|
-| `b` (`chain`) | 0xb40c4 | 0xe92d4038 | `hook_start` | First instruction (`push {r3-r5, lr}`) of 0xb40c4, start a shuffled play list |
-| `bl` | 0xb4128 | 0xebff80c4 | `hook_shuffle` | `bl 0x94440`, the shuffle, in 0xb40c4 |
-| `bl` | 0xbb440 | 0xebff63fe | `hook_smart_shuffle` | `bl 0x94440` in the smart playlist evaluation 0xbb28c |
-| `b` (`chain`) | 0xac4c4 | 0xe92d4ff8 | `hook_next` | First instruction (`push {r3-r11, lr}`) of 0xac4c4, the "next song" action |
-| `bl` | 0xac55c | 0xeb03a8d7 | `hook_next_item` | `bl 0x1968c0`, the next item of the play list |
-| `bl` | 0xac588 | 0xeb00fc20 | `hook_stop` | `bl 0xeb610` with no song: the stop |
-| `bl` | 0xac5d4, 0xac750 | 0xeb00fc0d, 0xeb00fbae | `hook_set` | `bl 0xeb610`, set the song |
-| `b` (`chain`) | 0xac6f4 | 0xe92d4ff0 | `hook_play` | First instruction (`push {r4-r11, lr}`) of 0xac6f4, play a song |
-| `bl` | 0xac7b4 | 0xeb017c36 | `hook_open` | `bl 0x10b894`, probably the open of the decoder |
-| `b` (`chain`) | 0xc7518, 0x11ca20 | 0xe92d4070, 0xe92d4070 | `hook_alloc`, `hook_new` | First instruction (`push {r4-r6, lr}`) of the two allocators |
-| `bl` | 0x1d8260 | 0xeb0000c2 | `hook_event` | `bl 0x1d8570` (long-push timer) in the UI event handler 0x1d81cc. The same site as `usb-host-probe` |
-
-**Caution.** Do not install this patch together with `usb-host-probe`. The two patches use the hook site 0x1d8260. `Patcher.conflicts` finds this: the app does not turn on the second patch, the Patches pane shows "Changes the same place as …", and the build fails. The test `testPlaybackLogConflicts` checks it.
-
-**Test status.** Swift and Python tests (29 October 2026): the log text, the size, each hook word and the chain wrappers. A build with the 17 patches that are not `test` or `internal` links with no conflict. Not tested in the emulator. Real iPod 5.5G (owner, 30 October 2026, version 1.0): the log operates, with 17 patches and 5202 songs. The value `track` is not correct: it is the text `FILE`. Version 1.1 removes it, adds the settings and records a song ID. Version 1.2 gave `song=0`. Version 1.3 uses the dbid. Versions 1.1 and 1.2 are not tested on the real iPod. Refer to [re/playback-log.md](../re/playback-log.md#first-log-from-a-real-ipod).
-
-## battery-log
-
-**User interface.** Patches pane > Battery Log, letter `r`. It is a test patch: turn on **Enable Test Patches** to see it. "Clear the Battery Log" writes an empty 262144-byte `iPod_Control/iTunes/iPodFirmBatteryLog`. The option "Time Between Samples" gives 1, 5 or 30 minutes. The tool `battery-log` gives the section "Battery Log". The iPod pane lists the log if the file has data.
-
-**Effect.** The iPod records the raw battery value to the file at each sample. It needs no button press. The first sample comes 60 s after the start. Each line has the seconds, the raw value, the icon value and the charger state.
-
-**Method.** A `bl` hook at 0x1d91f8 in the firmware timer handler 0x1d91dc wraps 0x1e7fe4. The handler is the periodic battery read of the UI. The patch reads the raw value with 0x9b284. It writes each line, then the header with the end of the text.
-
-**Test status.** Swift tests (31 October 2026). Not tested in the emulator. Real iPod 5.5G (owner, 31 October 2026, version 0.1): 34 samples in 2.77 hours of music, with no gap. Second test (1 November 2026): 220 samples in 18.3 hours, until the iPod stopped. The fourth column was always 1 with no charger, so its meaning is not proven.
-
-**Research.** Refer to [re/battery.md](../re/battery.md).
-
-**Test status.** Not tested in the emulator or on a real iPod.
-
-## diagnostic-log
-
-**User interface.** Patches pane > Diagnostic Log, letter `d`. It is a test patch: turn on **Enable Test Patches** to see it. "Clear the Diagnostic Log" writes an empty 32768-byte `iPod_Control/iTunes/iPodFirmDiagnosticLog` on the connected iPod. The tool `diagnostic-log` gives the section "Diagnostic Log". This section has the same buttons as "Playback Log". The iPod pane lists the log if the file has data.
-
-**Areas.** The patch has one On/Off option for each area: Playback, Memory, Power and Storage, Artwork and Files, Performance. The default is On. All areas on gives the complete log. One area on gives a log of that area only. A switch stops the lines only: the hooks stay in the firmware, and the RAM use does not change. To change a switch, flash the iPod again.
-
-**Effect.** Playback: the records of `playback-log`, and each key push and release. Memory: each failed allocation, and each change of 64 KB or more in the free memory. Power and Storage: each sleep and wake, each change of the storage power, and each change of the raw charger value. Artwork and Files: each artwork lookup and load, each file open of 100 ms or more, and each file read of 16 KB or more or of 100 ms or more. Performance: a sample at most each 30 seconds at a button or wheel event. The iPod writes the log at a button or wheel event, at most one time each 5 seconds. The iPod also writes the log before each sleep.
-
-**Research.** Refer to [re/diagnostic-log.md](../re/diagnostic-log.md).
-
-**Load address.** `extended`. The code, the data and the 32 KB log buffer (`.bss`) are 41768 bytes.
-
-**Hooks.** The 13 hooks of [playback-log](#playback-log), and these 8 hooks:
-
-| Kind | At | Expect | To | Original |
-|---|---|---|---|---|
-| `bl` | 0x1d9344 | 0xeb005561 | `hook_sleep_start` | `bl 0x1ee8d0`, the sleep sequence |
-| `bl` | 0x1dfe18 | 0xebfb516f | `hook_sleep` | `bl 0xb43dc`, the sleep function |
-| `b` (`chain`) | 0x265cc8 | 0xe92d4ff8 | `hook_drive` | First instruction (`push {r3-r11, lr}`) of the storage power function |
-| `bl` | 0x2055dc | 0xebffb00e | `hook_art_find` | `bl 0x1f161c`, the artwork lookup in ArtworkLoadTask |
-| `bl` | 0x205854 | 0xeb008012 | `hook_art_load` | `bl 0x2258a4`, the image load in ArtworkLoadTask |
-| `b` (`chain`) | 0x8f38c | 0xe92d41fc | `hook_file_open` | First instruction (`push {r2-r8, lr}`) of the file open |
-| `b` (`chain`) | 0x8f464 | 0xe92d4ff8 | `hook_file_read` | First instruction (`push {r3-r11, lr}`) of the file read |
-| `word` (`chain`) | 0x6701f0 | 0x001d81cc | `hook_ui` | The event method 0x1d81cc. `cover-flow` uses the same word, and this hook chains to it |
-
-**Caution.** Only one of `diagnostic-log`, `playback-log` and `usb-host-probe` can be on at a time, because they use the hook site 0x1d8260. `Patcher.conflicts` finds this: the app does not turn on the second patch, the Patches pane shows "Changes the same place as …", and the build fails. The test `testDiagnosticLogConflicts` checks it.
-
-**Test status.** Swift and Python tests (31 October 2026): the log header, the size, each `expect` value, each hook word and the chain wrappers. A build with the 17 patches that are not `test` or `internal` links with no conflict. Not tested in the emulator or on a real iPod.
 
 ## Storage type
 

@@ -1,6 +1,6 @@
 # iPodFirm
 
-iPodFirm is a Mac app that adds new features to the iPod Video (5th generation and 5.5th generation). Examples are Dark Mode, small album artwork in the lists, Cover Flow and an Album Artists menu. Other examples are Playlist Folders, Up Next, Search on the iPod 5G and PoC USB-C headphone support. The app can also change the pictures and the text of the firmware, and copy your purchased iPod games to the iPod.
+iPodFirm is a Mac app that adds new features to the iPod Video (5th generation and 5.5th generation). Examples are Dark Mode, small album artwork in the lists, Cover Flow and an Album Artists menu. Other examples are Up Next, Album Mix Shuffle, Custom EQ and PoC USB-C headphone support. The app can also change the pictures and the text of the firmware, and copy your purchased iPod games to the iPod.
 
 iPodFirm changes the Apple operating system of the iPod ("RetailOS", firmware 1.3). It does not replace it, like Rockbox does. The iPod keeps its menus, its music library and its sync with Finder or iTunes.
 
@@ -110,20 +110,13 @@ The table shows the status that the test notes record. For the full test record,
 | SSD Mode | k | For flash storage. Keeps the storage on after each access for a time that you select (1 to 60 minutes, default 30), not for 1 second. Songs start faster. | Yes |
 | Wake Storage on Input | w | For flash storage. Starts the storage when you push a button, so that the first song starts sooner after a long pause. The storage stays on for a time that you select. | Yes |
 | Sleep Now | s | The Sleep item puts the iPod to sleep immediately. Use it with SSD Mode. | Yes |
-| Instant Save | i | Saves each change in Settings > Main Menu immediately. Without it, the iPod saves the change only when it sleeps. | Yes |
 | No EU Volume Limit | v | Removes the volume limit of iPods for the EU. | No. The test needs an iPod for the EU. |
-| Search on the 5G | e | Shows the Search menu on the iPod 5G. Firmware 1.3 shows it only on the 5.5G. On a 5.5G, the patch changes nothing. | No. RetroCux tested the same byte on a 5G. |
 | Click Only on the Speaker | p | The click of the click wheel plays only from the speaker in the iPod, not in the headphones. | Yes |
 | Shuffle Fixes | f | Corrects four errors in the shuffle. The most important: with more than 32767 songs, the shuffle writes outside the list and the order is wrong. | Yes |
 | Up Next | n | Hold Select on a song, an album or an artist while music plays: the songs play next (Play Next) or after the last song (Play Last). Settings > Hold Select selects the action: Play Next, Play Last, On-The-Go or Cover Flow (in the Albums list, with the Cover Flow patch). | Yes (version 0.5) |
 | Custom EQ | q | Adds up to 5 of your own named EQs to Settings > EQ, with 3 bands, or 5 after a warning. You set the bands in the app, and you can share them as a `.ipodeq` file. | Yes. Version 0.1 operates. Version 0.2 and later are not tested. |
-| Playlist Folders | o | Puts playlists into folders in the Playlists list. You make the folders and their names in the app. Refer to [Playlist Folders](#playlist-folders). | Yes. The folders operate. |
 | Album Mix Shuffle | x | Adds Album Mix to Settings > Shuffle: the albums and the songs in each album play in a random order. Settings > Main Menu > Shuffle adds a main menu item that changes the Shuffle value. It needs Shuffle Fixes, and the app turns on Shuffle Fixes with it. | Yes (version 1.2) |
-| Something Comforting | m | An example patch. A Settings item plays a short song on the internal speaker of the iPod. | Yes |
 | USB-C Audio | u | Plays the music through USB-C headphones. Refer to [USB-C Audio](#usb-c-audio). | Yes (version 1.9) |
-| Playback Log | g | A test patch. It records the shuffle, the playback, the memory and the installed patches in a log on the iPod. The iPod pane shows the log in the section **Logs on This iPod**. Turn on Enable Test Patches to see it. Use it when the music stops. "Save the Log to Share…" makes a text file. "Report on GitHub…" also opens a new issue (a GitHub account is necessary). | No |
-| Diagnostic Log | d | A test patch. It records the playback, the memory, the power, the artwork and the performance in a log on the iPod. A switch selects each area. Turn on Enable Test Patches to see it. Only one of Playback Log and Diagnostic Log can be on. | No |
-| USB Host Probe | h | A test patch for research only. Refer to [USB Host Probe](#usb-host-probe). | Yes (up to version 1.29) |
 
 ### The space for patches
 
@@ -142,20 +135,6 @@ A custom playlist image needs a thumbnail file:
 3. Click **Write Thumbnails to iPod**.
 
 Write the file again after each change. The pictures of the file come before the pictures that the iPod makes.
-
-### Playlist Folders
-
-The Playlists list shows the folders and the playlists that are not in a folder. Select a folder to see its playlists. Push Menu to go back.
-
-1. Connect the iPod so that it shows in Finder.
-2. In the **Patches** pane, select "Playlist Folders".
-3. Click **Add Folder**. Type a name.
-4. Open the folder row. Turn on each playlist that goes into the folder.
-5. Select the position of the folders: **Folders First** or **Alphabetical**.
-6. Click **Write Folders to iPod**.
-7. Eject the iPod.
-
-A folder cannot have the name of a playlist. A folder has no colour square at this time.
 
 ### Import an iPodWizard theme
 
@@ -211,18 +190,6 @@ The author tested the patch with Apple USB-C EarPods and an Anker PowerExpand+ d
 A hardware mod can give 5 V to the headphones without a dock. The author did not make this mod. For the design, refer to [docs/usb-c-power-mod.md](docs/usb-c-power-mod.md). Do your own research before you make a hardware change.
 
 The 3.5 mm jack cannot use the buttons of headphones. On the iPod Video, the fourth contact of the jack is for video out.
-
-### USB Host Probe
-
-WARNING: This is a test patch for research only. The iPod can stop in a condition that you cannot repair.
-
-The USB Host Probe puts the iPod in USB host mode. Then a computer cannot connect to the iPod until the iPod restarts. The probe also plays test beeps and a 1 kHz tone at full volume.
-
-- Before you install it, make sure that the click wheel and the Select button operate.
-- Make sure that you can put the iPod in disk mode.
-- Remove your headphones before the test tone plays.
-
-The app shows the probe only if you switch on iPodFirm > Settings… > Patches > Enable Test Patches. Do not install it together with USB-C Audio.
 
 ### Make or install a patch
 
@@ -513,8 +480,6 @@ The idea of Playlist Folders comes from the Reddit user [u/Linusssk](https://www
 The user braniak87 found the cause of a crash when the Patches pane opened (GitHub issue 1). braniak87 also gave the fix and tested it.
 
 In the app, select Help > Thanks… to see these people. The newest fixes are at the top. To add a person, add an entry with the release `version` to `Thanks.people` in [Thanks.swift](mac/Sources/IPodFWKit/Thanks.swift) and to this section.
-
-The `something-comforting` patch plays a short part of "Something Comforting" by Porter Robinson. The patch is an example only.
 
 ## Legal
 

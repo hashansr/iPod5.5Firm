@@ -967,40 +967,6 @@ final class PatchAndArtTests: XCTestCase {
         }
     }
 
-    /// usb-audio-out has the code of usb-host-probe and the same hook sites: the app must not turn on both.
-    func testUSBAudioOutConflictsWithProbe() {
-        let all = Patcher.list(in: Self.repo.appendingPathComponent("patches"))
-        let pair = all.filter { ["usb-audio-out", "usb-host-probe"].contains($0.spec.name) }
-        XCTAssertEqual(pair.count, 2)
-        XCTAssertFalse(Patcher.conflicts(pair).isEmpty)
-    }
-
-    /// playback-log and usb-host-probe both hook 0x1d8260 with no chain: the app must not turn on both.
-    /// playback-log has no conflict with the patches that are not test or internal patches.
-    func testDiagnosticLogConflicts() throws {
-        let all = Patcher.list(in: Self.repo.appendingPathComponent("patches"))
-        let log = try XCTUnwrap(all.first { $0.spec.name == "diagnostic-log" })
-        let playback = try XCTUnwrap(all.first { $0.spec.name == "playback-log" })
-        let probe = try XCTUnwrap(all.first { $0.spec.name == "usb-host-probe" })
-        XCTAssertFalse(Patcher.conflicts([log, playback]).isEmpty)
-        XCTAssertFalse(Patcher.conflicts([log, probe]).isEmpty)
-        for p in all where p.spec.internal != true && !p.spec.isTest {
-            XCTAssertTrue(Patcher.conflicts([log, p]).isEmpty, "diagnostic-log conflicts with \(p.spec.name)")
-        }
-    }
-
-    func testPlaybackLogConflicts() throws {
-        let all = Patcher.list(in: Self.repo.appendingPathComponent("patches"))
-        let log = try XCTUnwrap(all.first { $0.spec.name == "playback-log" })
-        let probe = try XCTUnwrap(all.first { $0.spec.name == "usb-host-probe" })
-        let pair = Patcher.conflicts([log, probe])
-        XCTAssertEqual(pair.count, 1)
-        XCTAssertEqual(pair.first?.2, "hook at 0x1d8260")
-        for p in all where p.spec.internal != true && !p.spec.isTest {
-            XCTAssertTrue(Patcher.conflicts([log, p]).isEmpty, "playback-log conflicts with \(p.spec.name)")
-        }
-    }
-
     /// shuffle-album-mix needs shuffle-fixes: a build without it fails. Each name in `needs` is a patch.
     func testPatchNeeds() {
         let all = Patcher.list(in: Self.repo.appendingPathComponent("patches"))
@@ -1060,18 +1026,6 @@ final class PatchAndArtTests: XCTestCase {
         let probe = all.first { $0.spec.name == "usb-audio-out" }!.spec
         XCTAssertEqual(probe.changedBytes, 0)
         XCTAssertEqual(probe.sizeText, PatchSpec.byteText(probe.size!))
-    }
-
-    /// The test patches (category "test") show only when Settings > Patches > Enable Test Patches is on.
-    func testTestPatchesHidden() {
-        let all = Patcher.list(in: Self.repo.appendingPathComponent("patches"))
-        XCTAssertTrue(all.first { $0.spec.name == "usb-host-probe" }!.spec.isTest)
-        XCTAssertFalse(all.first { $0.spec.name == "usb-audio-out" }!.spec.isTest)
-        let hidden = PatchSpec.visible(all, showTests: false), shown = PatchSpec.visible(all, showTests: true)
-        XCTAssertFalse(hidden.contains { $0.spec.name == "usb-host-probe" })
-        XCTAssertTrue(shown.contains { $0.spec.name == "usb-host-probe" })
-        XCTAssertFalse(shown.contains { $0.spec.internal == true })
-        XCTAssertEqual(shown.count - hidden.count, all.filter { $0.spec.isTest && $0.spec.internal != true }.count)
     }
 
     func testPatchVersionCompare() {
@@ -1231,7 +1185,7 @@ final class PatchAndArtTests: XCTestCase {
             XCTAssertEqual(le32(osos, at), old)
             XCTAssertGreaterThanOrEqual(le32(out, at), 0x736800)       // a function in the extended area
         }
-        let others = ["album-art", "sleep-now", "flash-keep-awake", "flash-wake-on-input", "backlight-60s", "usb-host-probe", "cover-flow"]
+        let others = ["album-art", "sleep-now", "flash-keep-awake", "flash-wake-on-input", "backlight-60s", "cover-flow"]
         let set = all.filter { others.contains($0.spec.name) }
         XCTAssertTrue(Patcher.conflicts(set).isEmpty)
         _ = try Patcher.apply(set, to: osos)
@@ -1563,21 +1517,20 @@ final class PatcherOptionTests: XCTestCase {
         XCTAssertThrowsError(try Patcher.apply([patch], to: osos))
     }
 
-    /// The usb-host-probe patch: the extended area, a bl in the UI event handler and two driver table words.
     /// The space measurement agrees with a real build, and finds a build that is too large.
     func testSpaceUse() throws {
         guard let ipsw = ProcessInfo.processInfo.environment["IPODFW_IPSW"] else { throw XCTSkip("set IPODFW_IPSW") }
         let osos = try FirmwarePartition(data: IPSW.extractFirmware(URL(fileURLWithPath: ipsw)).data).image("osos")
         let all = Patcher.list(in: PatchAndArtTests.repo.appendingPathComponent("patches"))
-        let set = all.filter { ["album-art", "flash-wake-on-input", "usb-host-probe"].contains($0.spec.name) }
+        let set = all.filter { ["album-art", "flash-wake-on-input"].contains($0.spec.name) }
         let sizes = try set.map { (patch: $0, size: try Patcher.codeSize($0)) }
-        XCTAssertGreaterThan(sizes.first { $0.patch.spec.name == "usb-host-probe" }!.size, 1000)
+        XCTAssertGreaterThan(sizes.first { $0.patch.spec.name == "album-art" }!.size, 1000)
         let use = Patcher.spaceUse(osos: osos, patches: sizes)
         XCTAssertEqual(use.end, try Patcher.apply(set, to: osos).count)
         XCTAssertTrue(use.fits)
         // patches with menus ("settings_items", "menu_items"): the measurement counts the menus,
         // and the patches follow each other without a 0x800 gap
-        let menus = all.filter { ["album-art", "album-artists", "cover-flow", "instant-save", "something-comforting", "usb-host-probe"].contains($0.spec.name) }
+        let menus = all.filter { ["album-art", "album-artists", "cover-flow"].contains($0.spec.name) }
         let menuSizes = try menus.map { (patch: $0, size: try Patcher.codeSize($0)) }
         let built = try Patcher.apply(menus, to: osos)
         let menuUse = Patcher.spaceUse(osos: osos, patches: menuSizes)
@@ -1586,265 +1539,16 @@ final class PatcherOptionTests: XCTestCase {
         XCTAssertEqual(menuUse.parts.reduce(0) { $0 + $1.bytes }, menuUse.used)
         XCTAssertEqual(menuUse.parts.compactMap { if case .patch(let n) = $0.kind { n } else { nil } }, menus.map(\.spec.name))
         XCTAssertTrue(menuUse.parts.allSatisfy { $0.bytes > 0 })
-        let data = menuSizes.reduce(0) { $0 + $1.size } + (4 + 40 * 11) + (4 + 40 * 32) + (4 + 40 * 29) + (4 + 40 * 19)
-        XCTAssertLessThan(built.count - Patcher.maxOSOSSize, data + 6 * 16 + 0x800)     // only the alignment and one rounding
+        let data = menuSizes.reduce(0) { $0 + $1.size } + (4 + 40 * 11) + (4 + 40 * 32) + (4 + 40 * 29)
+        XCTAssertLessThan(built.count - Patcher.maxOSOSSize, data + 3 * 16 + 0x800)     // only the alignment and one rounding
         // after other data that leaves too little space
-        let probe = sizes.first { $0.patch.spec.name == "usb-host-probe" }!
+        let big = sizes.first { $0.patch.spec.name == "album-art" }!
         let filled = osos + [UInt8](repeating: 0, count: Patcher.SpaceUse.limit - 0x800 - osos.count) + [1]
-        let over = Patcher.spaceUse(osos: filled, patches: [probe])
+        let over = Patcher.spaceUse(osos: filled, patches: [big])
         XCTAssertFalse(over.fits)
-        XCTAssertThrowsError(try Patcher.apply([probe.patch], to: filled, originalSHA256: Patcher.sha256(osos)))
+        XCTAssertThrowsError(try Patcher.apply([big.patch], to: filled, originalSHA256: Patcher.sha256(osos)))
     }
 
-    func testUSBHostProbe() throws {
-        guard let ipsw = ProcessInfo.processInfo.environment["IPODFW_IPSW"] else { throw XCTSkip("set IPODFW_IPSW") }
-        let osos = try FirmwarePartition(data: IPSW.extractFirmware(URL(fileURLWithPath: ipsw)).data).image("osos")
-        let repo = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("../../..").standardized
-        let all = Patcher.list(in: repo.appendingPathComponent("patches"))
-        let probe = all.filter { $0.spec.name == "usb-host-probe" }
-        XCTAssertEqual(probe.count, 1)
-        let out = try Patcher.apply(probe, to: osos)
-        XCTAssertGreaterThan(out.count, Patcher.maxOSOSSize)
-        XCTAssertEqual(le32(out, 0x1d8260) & 0xFF00_0000, 0xEB00_0000)
-        XCTAssertNotEqual(le32(out, 0x1d8260), le32(osos, 0x1d8260))
-        // the wrappers are in the probe code, which starts at 0x736800 and is shorter than 24 KB (version 1.21: 19760 bytes)
-        for at in [0x6c8730, 0x6c878c] { XCTAssertTrue((Patcher.maxOSOSSize..<Patcher.maxOSOSSize + 0x6000).contains(Int(le32(out, at)))) }
-        // after other data (a theme and the Dark Mode items to 0x7eb123): the probe goes after it
-        var filled = osos + [UInt8](repeating: 0, count: 0x7eb123 - osos.count)
-        filled[0x7eb122] = 1
-        let after = try Patcher.apply(probe, to: filled, originalSHA256: ThemeImport.sha256(osos))
-        XCTAssertTrue((0x7eb130..<0x7eb130 + 0x6000).contains(Int(le32(after, 0x6c8730))))
-        // with the other code patches: different areas and hook sites
-        let names = ["album-art", "sleep-now", "flash-keep-awake", "flash-wake-on-input", "usb-host-probe"]
-        _ = try Patcher.apply(all.filter { names.contains($0.spec.name) }, to: osos)
-    }
-}
-
-/// The USB log of usb-host-probe, with the root hub record that the emulator wrote (2026-10-07).
-/// The text log of playback-log: the information block with the iPodFirm list, the lines, then zero bytes.
-final class PlaybackLogTests: XCTestCase {
-    func testText() throws {
-        let list = String(decoding: try JSONEncoder().encode(FirmwareManifest(app: "0.1.180 (181)", patches: [
-            .init(name: "up-next", version: "0.5", options: ["hold": 3]), .init(name: "shuffle-fixes", version: "2.2"), .init(name: "user-patch", version: "1.0")])), as: UTF8.self)
-        let info = "PL01 playback-log 1.0\nram=32 MB heap=3100000 lowest=2900000 failed=0\nlines=2 dropped=0 lost=0 writes=1\nlist " + list
-        var d = [UInt8](info.utf8) + [UInt8](repeating: 0x20, count: 2047 - info.utf8.count) + [0x0A]
-        d += [UInt8]("     0.000 shuffle start count=60\n     0.012 shuffle end result=1\n".utf8)
-        d += [UInt8](repeating: 0, count: PlaybackLog.fileSize - d.count)
-        XCTAssertEqual(PlaybackLog.text(d, letters: ["shuffle-fixes": "f", "up-next": "n"]), """
-            PL01 playback-log 1.0
-            ram=32 MB heap=3100000 lowest=2900000 failed=0
-            lines=2 dropped=0 lost=0 writes=1
-            app: 0.1.180 (181)
-            patches: 3, letters fn
-              n up-next 0.5 hold=3
-              f shuffle-fixes 2.2
-              - user-patch 1.0
-            0.000 shuffle start count=60
-            0.012 shuffle end result=1
-            """)
-        XCTAssertNil(PlaybackLog.text([UInt8](repeating: 0, count: PlaybackLog.fileSize)))
-        XCTAssertNil(PlaybackLog.text([UInt8]("VL01".utf8)))
-        XCTAssertNil(PlaybackLog.text([UInt8]("PL03 other\n".utf8)))
-        XCTAssertEqual(PlaybackLog.text([UInt8]("PL02 diagnostic-log 2.0\nareas playback=1 memory=0 power=0 artwork=0 performance=0\nlist none\n".utf8)),
-                       "PL02 diagnostic-log 2.0\nareas playback=1 memory=0 power=0 artwork=0 performance=0\npatches: not known (none)")
-        XCTAssertEqual(PlaybackLog.text([UInt8]("PL01 playback-log 1.0\nlist none\n".utf8)), "PL01 playback-log 1.0\npatches: not known (none)")
-    }
-
-    /// A line with a track ID gets the song, and a list at the end has each song in the log.
-    func testSongs() {
-        let log = "PL01 playback-log 1.1\nsettings shuffle=Songs repeat=Off hold=Play Next\n"
-        let lines = "     0.033   shuffle n=2 first=1a,2b,0 heap=1\n     0.314 play from=abc5c song=1a flags=1 heap=2\n     1.000   set song failed: -50 song=99 heap=2\n"
-        let d = [UInt8](log.utf8) + [UInt8](lines.utf8)
-        let songs = [ITunesDB.TrackInfo(id: 1, dbidLow: 0x1a, title: "One", artist: "A", album: "B", path: ":iPod_Control:Music:F00:X.mp3"),
-                     ITunesDB.TrackInfo(id: 2, dbidLow: 0x2b, title: "Two", artist: "C", album: "D", path: ":P")]
-        let text = PlaybackLog.text(d, songs: songs) ?? ""
-        XCTAssertTrue(text.contains("0.314 play from=abc5c song=1a flags=1 heap=2 \"One\" - A"))
-        XCTAssertTrue(text.contains("  ID 1a: One | A | B | :iPod_Control:Music:F00:X.mp3"))
-        XCTAssertTrue(text.contains("  ID 2b: Two | C | D | :P"))
-        XCTAssertTrue(text.contains("  ID 99 is not in the iTunesDB"))
-        XCTAssertTrue(text.contains("set song failed: -50 song=99 heap=2 (ID 99 is not in the iTunesDB)"))
-        XCTAssertFalse(text.contains("ID 0 "))
-        XCTAssertFalse((PlaybackLog.text(d) ?? "").contains("Songs in this log"))
-    }
-
-    func testFileName() {
-        var c = DateComponents(); c.year = 2026; c.month = 10; c.day = 29; c.hour = 23; c.minute = 15
-        let date = Calendar.current.date(from: c)!
-        XCTAssertEqual(PlaybackLog.fileName(date: date), "iPodFirm Playback Log 2026-10-29 2315.txt")
-    }
-
-    /// The new issue has the information lines of the log, not the timed lines, and a short body.
-    func testIssueURL() throws {
-        let log = "PL01 playback-log 1.0\nram=32 MB heap=3100000 lowest=2900000 failed=0\npatches: 2, letters fn\n0.000 play from=ac5b8\n1.500 stop: no next song"
-        let url = PlaybackLog.issueURL(log: log, appVersion: "0.1.180 (181)", fileName: "log.txt")
-        let c = try XCTUnwrap(URLComponents(url: url, resolvingAgainstBaseURL: false))
-        XCTAssertEqual(c.host, "github.com")
-        XCTAssertEqual(c.path, "/TheFauxDreamer/iPod5.5Firm/issues/new")
-        let items = Dictionary(uniqueKeysWithValues: (c.queryItems ?? []).map { ($0.name, $0.value ?? "") })
-        XCTAssertEqual(items["title"], "Playback log: the music stops")
-        let body = try XCTUnwrap(items["body"])
-        XCTAssertTrue(body.contains("ram=32 MB"))
-        XCTAssertTrue(body.contains("letters fn"))
-        XCTAssertTrue(body.contains("\"log.txt\""))
-        XCTAssertTrue(body.contains("0.1.180 (181)"))
-        XCTAssertFalse(body.contains("stop: no next song"))
-        let long = PlaybackLog.issueURL(log: String(repeating: "patch line\n", count: 1000), appVersion: "1", fileName: "f.txt")
-        let longBody = URLComponents(url: long, resolvingAgainstBaseURL: false)?.queryItems?.first { $0.name == "body" }?.value ?? ""
-        XCTAssertLessThanOrEqual(longBody.count, 1500)
-    }
-}
-
-final class USBProbeLogTests: XCTestCase {
-    func testParseRootHubAndInterface() {
-        var d = [UInt8]("UL01".utf8) + [2, 0, 0, 0]
-        let hub: [UInt8] = [18, 1, 0, 2, 9, 0, 0, 64, 0xAC, 0x05, 0x31, 0x80, 0, 1, 1, 2, 0, 1]
-        func record(_ tag: UInt8, _ r1: [UInt8], _ r2: [UInt8]) -> [UInt8] {
-            [0xA5, tag, 0, 0] + [UInt8](repeating: 0, count: 16)
-                + r1 + [UInt8](repeating: 0, count: 20 - r1.count) + r2 + [UInt8](repeating: 0, count: 20 - r2.count) + [0, 0, 0, 0]
-        }
-        d += record(2, hub, [])                                              // hub: initialize device
-        d += record(15, [9, 4, 0, 0, 2, 8, 6, 0x50, 0], hub)                 // storage: initialize interface
-        var port = record(30, [], [])                                        // root port: connected, power, change connection
-        port.replaceSubrange(4..<16, with: [1, 0, 0, 0, 0x01, 0x01, 0x01, 0x00, 0x01, 0x10, 0x00, 0x08])
-        d += port
-        var regs = record(31, [], [])                                        // controller registers
-        regs.replaceSubrange(4..<20, with: [1, 0, 0, 0, 0, 0x10, 0, 0, 0x01, 0x10, 0, 0, 0, 0x0E, 0, 0])
-        d += regs
-        d[4] = 4
-        let log = USBProbeLog.parse(d)!
-        XCTAssertEqual(log.count, 4)
-        XCTAssertEqual(log[3].text, "Controller: USBCMD 0x00000001 (run), USBSTS 0x00001000 (halted), PORTSC 0x00001001 (connected, power, full speed), OTGSC 0x00000E00 (VBUS valid, B-session valid, A-session valid)")
-        XCTAssertEqual(log[2].text, "Root port 1: status 0x0101 (connected, power), change 0x0001 (connection), PORTSC 0x08001001 (connected, power, high speed, line SE0)")
-        XCTAssertEqual(log[0].text, "Hub: initialize device — device 05AC:8031, class 09/00/00 (hub)")
-        XCTAssertEqual(log[1].text, "Storage: initialize interface — interface 0 (alternate 0), class 08/06/50 (storage) — device 05AC:8031, class 09/00/00 (hub)")
-        XCTAssertNil(USBProbeLog.parse([UInt8](repeating: 0, count: 4096)))
-        // the setup packets that the emulator logged for the root hub
-        XCTAssertEqual(USBProbeLog.stageText(1, [0x80, 6, 0, 1, 0, 0, 0x12, 0]), "setup: GET_DESCRIPTOR device 0, 18 bytes")
-        XCTAssertEqual(USBProbeLog.stageText(1, [0, 5, 0x30, 0, 0, 0, 0, 0]), "setup: SET_ADDRESS 48")
-        XCTAssertEqual(USBProbeLog.stageText(0, []), "status stage")
-        XCTAssertEqual(USBProbeLog.stageText(1, [UInt8](repeating: 0, count: 12)), "data stage, buffer 000000000000000000000000")
-    }
-
-    /// Data records (tag 44): a configuration descriptor of 51 bytes in two records of 40 bytes.
-    func testConfigurationDescriptorData() {
-        let config: [UInt8] = [9, 2, 51, 0, 2, 1, 0, 0x80, 50,
-                               8, 11, 0, 2, 1, 0, 0x20, 0,                      // interface association, UAC2
-                               9, 4, 1, 1, 1, 1, 2, 0x20, 0,                    // interface 1 alternate 1, streaming
-                               7, 5, 0x01, 0x05, 0xC0, 0x00, 1,                 // endpoint 1 OUT isochronous, asynchronous
-                               11, 0x24, 2, 1, 2, 2, 16, 1, 0x44, 0xAC, 0,      // UAC1 format type I, 44100 Hz
-                               2, 0x24, 0, 0, 0, 0, 0]
-        var d = [UInt8]("UL01".utf8) + [2, 0, 0, 0]
-        for offset in stride(from: 0, to: config.count, by: 40) {
-            let chunk = Array(config[offset..<min(config.count, offset + 40)])
-            let regs = [UInt32(0x93C33E34), 0x93C40000, UInt32(offset), UInt32(config.count)]
-            d += [0xA5, 44, 0, 0] + regs.flatMap { v in (0..<4).map { UInt8(v >> (8 * $0) & 0xFF) } }
-            d += chunk + [UInt8](repeating: 0, count: 44 - chunk.count)
-        }
-        let log = USBProbeLog.parse(d)!
-        XCTAssertEqual(log[0].text, "Data: configuration descriptor, bytes 0–39 of 51: " + config.prefix(40).map { String(format: "%02X", $0) }.joined())
-        let lines = log.filter { $0.driver == "Configuration" }.map(\.call)
-        XCTAssertEqual(lines.count, 6)
-        XCTAssertTrue(lines[0].hasPrefix("configuration 1: total length 51, 2 interfaces, attributes 0x80, power 100 mA"))
-        XCTAssertTrue(lines[1].hasPrefix("interface association: first interface 0, 2 interfaces, class 01/00/20 (audio)"))
-        XCTAssertTrue(lines[2].hasPrefix("interface 1 alternate 1: 1 endpoints, class 01/02/20 (audio) (streaming), USB Audio Class 2"))
-        XCTAssertTrue(lines[3].hasPrefix("endpoint 0x01 (OUT isochronous, asynchronous), max packet 192, interval 1"))
-        XCTAssertTrue(lines[4].hasPrefix("audio class interface descriptor, subtype 2: format type 1, 2 channels, 2 bytes per sample, 16 bits, rates 44100 Hz"))
-    }
-
-    /// The timing record of usb-audio-out 1.5 (tag 76).
-    func testTimingRecord() {
-        XCTAssertEqual(USBProbeLog.audioText(76, [0x0107_0005, 0x0258_0136, 0x0302_00F5, 0x1802_0329]),
-                       "timing 5 s — On, host mode, USB music route, playing; idle core 0 31.0 %, core 1 60.0 %; latest wake +24.5 ms, 2 wakes > 5 ms late, 3 > 20 ms; USBAudioTask 41 wakes, longest fill 0.3 ms, longest sleep +2 ms, fewest frames ahead 24")
-        XCTAssertEqual(USBProbeLog.audioText(77, [1000, 0x0080_0003, 120, 81_500]),
-                       "timing counts — 1000 USB interrupts, 3 siTD errors, host task 128 messages and 120 timeouts, packet fill 81.5 ms in total")
-        XCTAssertEqual(USBProbeLog.audioText(77, [1, 0, 0x03E8_0078, 12_000]),
-                       "timing counts — 1 USB interrupts, 0 siTD errors, host task 0 messages and 120 timeouts, packet fill 12.0 ms in total (1000 packets with the fast fill)")
-        XCTAssertEqual(USBProbeLog.audioText(78, [44100, 44100, 0x0100_0001, 120_500]),
-                       "timing source — input 44100 Hz, output 44100 Hz, converter flag 1, source +0 0, +1 0, route 1; Apple fill 120.5 ms")
-        XCTAssertEqual(USBProbeLog.audioText(76, [0x0001_0000, 0x03E8_03DE, 0, 0]),
-                       "timing 0 s — On, stopped; idle core 0 99.0 %, core 1 100.0 %; latest wake +0.0 ms, 0 wakes > 5 ms late, 0 > 20 ms")
-    }
-
-    /// The records of the isochronous test (tags 48–51).
-    func testAudioRecords() {
-        XCTAssertEqual(USBProbeLog.audioText(48, [116, 0x020201, 192, 9]),
-                       "device found — address 116, interface 1 alternate 2, endpoint 2 OUT, max packet 192, clock source 9")
-        XCTAssertEqual(USBProbeLog.audioText(49, [0x0002_0B01, 1, 0x0008_0E00, 0x8000_0D00]),
-                       "SET_INTERFACE 1 alternate 2: correct, setup token 0x00080E00, status token 0x80000D00")
-        XCTAssertEqual(USBProbeLog.audioText(49, [0x0100_0121, 0x0004_0900, 0x0008_0E00, 0x8000_0D40]),
-                       "SET_CUR sampling frequency, clock 9: stall or error (0x40), setup token 0x00080E00, status token 0x80000D40")
-        XCTAssertEqual(USBProbeLog.audioText(50, [1240, 3, 0x0000_0008, 0x0200_0010]),
-                       "1 kHz tone: 1240 frames sent, 3 frames with an error, last error 0x00000008, frames 16 to 512")
-        XCTAssertEqual(USBProbeLog.audioText(52, [44100, 0x010101, 1, 1]),
-                       "music route on — 44100 Hz, output flags +0x58 1, +0x59 1, +0x5a 1 (1 = USB), stream 1")
-        XCTAssertEqual(USBProbeLog.audioText(53, [60000, 2, 24, 0x0001_0101]),
-                       "music — 60000 packets sent (60 s), 2 underruns, 24 packets with sound, route +0x5a 1, stream 1, source +0 1, +1 0 (1 = test signal)")
-        XCTAssertEqual(USBProbeLog.audioText(55, [800, 200, 400, 10000]),
-                       "CPU — 800 sleeps; probe copy 200 ms (2.0 %), Apple packet fill 400 ms (4.0 %) of 10000 ms")
-        XCTAssertEqual(USBProbeLog.audioText(57, [10000, 853, 0, 2]), "CPU idle — host mode: 85.3 % (core 1 0.0 %) in 10000 ms")
-        XCTAssertEqual(USBProbeLog.audioText(58, [9, 0, 120, 3000]), "art step 9 (artwork lookup) — result 0x0, 120 µs, at 3000 ms")
-        XCTAssertEqual(USBProbeLog.audioText(59, [12, 4, 1, 250000]), "art summary step 12 (image load) — 4 calls, 1 with result 0, longest 250000 µs")
-        XCTAssertEqual(USBProbeLog.audioText(60, [5, 9000, 1, 9000]), "art task — in step 5 (lock 1) for 9000 ms; last step 1, 9000 ms ago")
-        XCTAssertEqual(USBProbeLog.audioText(60, [0, 0, 14, 20]), "art task — no step in progress; last step 14 (gate release), 20 ms ago")
-        XCTAssertEqual(USBProbeLog.audioText(56, [1, 30000, 5, 2500]),
-                       "music stopped — the dock was disconnected, 30000 packets, 5 siTD errors, 2500 sleeps")
-        XCTAssertEqual(USBProbeLog.audioText(54, [0, 5, 0x0001_0302, 0xAC44_AC44]),
-                       "decoder chain — codec buffers 0, USB buffers 5, queue write 2 read 3, ready flag 0x1081dff6 = 1, flag 0x1081dff4 = 0, music rate 44100 Hz, output rate 44100 Hz")
-        XCTAssertEqual(USBProbeLog.audioText(62, [0x1088_0000, 0x10_0000, 3, 0x0001_0102]),
-                       "art cache (host mode) — object 0x10880000, capacity +0x74 1048576, +0x78 3, +0x70 1, +0x71 1, +0x72 0")
-        XCTAssertEqual(USBProbeLog.audioText(62, [0, 0, 0, 0]),
-                       "art cache (before the host start) — object 0x00000000, capacity +0x74 0, +0x78 0, +0x70 0, +0x71 0, +0x72 0")
-        XCTAssertEqual(USBProbeLog.audioText(63, [0x0402_0001, 0x1081_0000, 0x0001_0101, 0x1090_0000]),
-                       "art gates — library open +0x54 1, +0x55 0, requests 2, count +0xc 4; photo import 0x10810000 state 1, active 1, the start object yes; play queue +4 0x10900000")
-        XCTAssertEqual(USBProbeLog.audioText(63, [0, 0, 0xFFFF_FFFF, 0xFFFF_FFFF]),
-                       "art gates — library open +0x54 0, +0x55 0, requests 0, count +0xc 0; no photo import service; no play queue object")
-        XCTAssertEqual(USBProbeLog.audioText(64, [0x0102_0003, 500, 0, 5]),
-                       "art queues (later) — library queue 3, cache queue 0, 2 cache entries, the art cache entry +8 = 1, library +0x30 500, task event 0x00000000")
-        XCTAssertEqual(USBProbeLog.audioText(64, [0xFF00_0000, 0, 0, 0]),
-                       "art queues (before the host start) — library queue 0, cache queue 0, 0 cache entries, no entry for the art cache, library +0x30 0, task event 0x00000000")
-        XCTAssertEqual(USBProbeLog.audioText(65, [0x1390_0000, 0x1390_0000, 0x0001_0001, 0x0102]),
-                       "art database (host mode) — ArtworkDB handle +0xd2c 0x13900000, +0xd14 0x13900000; app reload flag +0x484 1, +0x489 0, reload done +0x48a 1, +0x487 0; USB device state 1")
-        XCTAssertEqual(USBProbeLog.audioText(65, [0xFFFF_FFFF, 0xFFFF_FFFF, 0xFFFF_FFFF, 0]),
-                       "art database (before the host start) — no database object; no app object; USB device state 0")
-        XCTAssertEqual(USBProbeLog.audioText(66, [0x6974_696C, 1200, 0x1390_0000, 0x00AB_CD07]),
-                       "ArtworkDB — first word 0x6974696C (correct), 1200 entries, +6 0, index 0x13900000; list lookup correct, index lookup correct (dbid …00ABCD)")
-        XCTAssertEqual(USBProbeLog.audioText(66, [0xFFFF_FFFF, 0, 0, 0]), "ArtworkDB — no ArtworkDB object")
-        XCTAssertEqual(USBProbeLog.audioText(67, [0x29CB_FE07, 0, 0x0001_0002, 0x0102]),
-                       "art add test 1 (host mode) — dbid …29CBFE07: +0x78 0 → 2, +0xc 0 → 1, added")
-        XCTAssertEqual(USBProbeLog.audioText(67, [0x1234, 0x0001_0002, 0x0001_0002, 5]),
-                       "art add test 0 (later) — dbid …00001234: +0x78 2 → 2, +0xc 1 → 1, nothing added")
-        XCTAssertEqual(USBProbeLog.audioText(67, [0, 0xFFFF_FFFF, 0xFFFF_FFFF, 0]),
-                       "art add test 0 (before the host start) — not run: no art cache or no ArtworkDB entry")
-        XCTAssertEqual(USBProbeLog.audioText(68, [0xC400, 0, 0x100, 0x0108]),
-                       "volume range — -60.0 dB to 0.0 dB, resolution 1.0000 dB, 1 sub-ranges")
-        XCTAssertEqual(USBProbeLog.audioText(68, [0, 0, 0, 0xFF]), "volume range — no answer; the probe uses −60 dB to 0 dB")
-        XCTAssertEqual(USBProbeLog.audioText(69, [128, 0xF3F5, 0x0000, 0x0003]),
-                       "volume — iPod output 128 of 256 → -12.0 dB; status channel 1 0x00, channel 2 0x00; request 3, 0 errors")
-        XCTAssertEqual(USBProbeLog.audioText(69, [0, 0x8000, 0x4040, 0x0001_0004]),
-                       "volume — iPod output 0 of 256 → silence; status channel 1 0x40, channel 2 0x40; request 4, 1 errors")
-        XCTAssertEqual(USBProbeLog.audioText(71, [0x0005_0203, 0x0000_0201, 0, 0]),
-                       "button report — interface 3, 2 bytes: 0102; pushed: volume +, play/pause; 0 errors")
-        XCTAssertEqual(USBProbeLog.audioText(71, [0x0000_0103, 0, 0, 0]), "button report — interface 3, 1 bytes: 00; pushed: none; 0 errors")
-        XCTAssertEqual(USBProbeLog.hidDescriptorText([0x001F_0503, 0, 0x0102_0100, 0x0000_0403], [0x05, 0x0C, 0x09, 0x01] + [UInt8](repeating: 0, count: 36)),
-                       "HID report descriptor — interface 3, endpoint 5 IN, 31 bytes; bytes 0–30: 050C0901000000000000000000000000000000000000000000000000000000; volume + bit 0, volume − bit 1, play/pause bit 2, next bit 3, previous bit 4, report ID 1, no array")
-        XCTAssertEqual(USBProbeLog.hidDescriptorText([0x00FF_0503, 0, 0, 0], []), "HID report descriptor — interface 3: no answer")
-        XCTAssertEqual(USBProbeLog.audioText(72, [0x047B, 1, 0x1390_0000, 0x1390_0000]),
-                       "key posted — volume + (private) push, result 1, sender 0x13900000, app port 0x13900000")
-        XCTAssertEqual(USBProbeLog.audioText(72, [0x073A, 0xFFFF_FFFF, 0, 0]), "key posted — stop release, result -1, sender 0x00000000, app port 0x00000000")
-        XCTAssertEqual(USBProbeLog.audioText(72, [0x0120, 0, 0, 0]), "key to the UI task (0x1ac198) — volume + push")
-        XCTAssertEqual(USBProbeLog.audioText(72, [0x001C, 0, 0, 0]), "key to the UI task (0x1ac198) — play/pause release")
-        XCTAssertEqual(USBProbeLog.audioText(74, [5, 1, 1050, 0x0000_0E00]),
-                       "device task — before the host start: the device session stopped (1050 ms); OTGSC 0x00000E00 (VBUS present)")
-        XCTAssertEqual(USBProbeLog.audioText(74, [1, 1, 0, 0x0000_0200]),
-                       "device task — the start of the device mode is blocked (host mode runs); OTGSC 0x00000200 (VBUS absent)")
-        XCTAssertEqual(USBProbeLog.audioText(74, [6, 4, 0x68C, 0]), "USB host message not shown (host mode runs) — type 4, no driver")
-        XCTAssertEqual(USBProbeLog.audioText(75, [1, 1, 0, 5]), "player — before the stop: playing; codec buffers 0, USB buffers 5")
-        XCTAssertEqual(USBProbeLog.audioText(75, [2, 5, 3, 0]), "player — later: paused; codec buffers 3, USB buffers 0")
-        XCTAssertEqual(USBProbeLog.audioText(75, [0, 3, 0, 0]), "player — after the pause key: stopped (0); codec buffers 0, USB buffers 0")
-        XCTAssertEqual(USBProbeLog.audioText(74, [4, 0, 0, 0]),
-                       "device task — the stop is skipped (host mode runs, no controller reset); OTGSC 0x00000000 (VBUS absent)")
-        XCTAssertEqual(USBProbeLog.audioText(73, [0x057D, 50, 45, 0]), "key in the UI task — volume − (private) repeat, volume level 50 → 45")
-    }
 }
 
 /// The setting "Firmware layout": the empty margin below 8 MB (32 KB or 64 KB).
@@ -1870,7 +1574,7 @@ final class OSOSMarginTests: XCTestCase {
 }
 
 final class DarkModeTests: XCTestCase {
-    /// The owner's case: "Switch on iPod" with a large theme, then an extended patch (usb-host-probe).
+    /// The owner's case: "Switch on iPod" with a large theme, then an extended patch (album-art).
     /// Needs IPODFW_IPSW and IPODFW_THEME (an .ipodtheme file).
     /// Split with Switch on iPod: the same osos as Python, and a correct size in the Patches pane.
     func testSwitchBuildWithSplitLayout() throws {
@@ -1907,52 +1611,10 @@ final class DarkModeTests: XCTestCase {
         XCTAssertEqual(Patcher.maxOSOSSize + size, info.patchAt + dark.spec.size!)
         XCTAssertTrue(switched[(info.patchAt + dark.spec.size!)...].allSatisfy { $0 == 0 })
         XCTAssertLessThanOrEqual(theme.addedSize, size)
-        let probe = all.filter { $0.spec.name == "usb-host-probe" }
-        let out = try Patcher.apply(probe, to: switched, originalSHA256: sha)
-        XCTAssertGreaterThan(Int(le32(out, 0x6c8730)), info.patchAt)
+        let art = all.filter { $0.spec.name == "album-art" }
+        let out = try Patcher.apply(art, to: switched, originalSHA256: sha)
+        XCTAssertGreaterThan(Int(le32(out, 0x66e470)), info.patchAt)
         XCTAssertLessThanOrEqual(out.count, ThemeImport.ososLimit)
-    }
-
-    /// The example patch something-comforting: alone, and after "Switch on iPod". Its hooks chain to the
-    /// Dark Mode hooks, and the Settings menu has both items. Needs IPODFW_IPSW.
-    func testSomethingComfortingAloneAndAfterSwitchBuild() throws {
-        guard let ipsw = ProcessInfo.processInfo.environment["IPODFW_IPSW"] else { throw XCTSkip("set IPODFW_IPSW") }
-        let partition = try FirmwarePartition(data: IPSW.extractFirmware(URL(fileURLWithPath: ipsw)).data)
-        let osos = try partition.image("osos")
-        let sha = ThemeImport.sha256(osos)
-        let repo = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("../../..").standardized
-        let all = Patcher.list(in: repo.appendingPathComponent("patches"))
-        let dark = all.first { $0.spec.name == "dark-mode" }!
-        let melody = all.filter { $0.spec.name == "something-comforting" }
-        XCTAssertEqual(melody.count, 1)
-        func keys(_ o: [UInt8]) throws -> [UInt32] {
-            let main = try Resources.mainBlock(Resources.scan(o, limit: Patcher.maxOSOSSize))
-            let r = main.resources.first { $0.type == "Menu" && $0.id == Patcher.settingsMenuID }!
-            let at = main.abs(r)
-            return (0..<Int(le32(o, at))).map { le32(o, at + 4 + 40 * $0 + 0x1C) }
-        }
-        // alone
-        let alone = try Patcher.apply(melody, to: osos, originalSHA256: sha)
-        var k = try keys(alone)
-        XCTAssertEqual(k[k.firstIndex(of: 0x6000_6088)! + 1], 0x6000_60E4)
-        XCTAssertGreaterThanOrEqual(le32(alone, 0x66c950), Patcher.patchAreaStart)
-        XCTAssertEqual(alone.count % 0x800, 0)
-        // after "Switch on iPod" with an empty theme
-        let theme = ImportedTheme(name: "empty", source_sha256: sha, osos_sha256: sha)
-        let (switched, info) = try DarkMode.build(partition: partition, osos: osos, theme: theme, patch: dark, originalSHA256: sha)
-        let darkSet = le32(switched, 0x66c950)
-        let out = try Patcher.apply(melody, to: switched, originalSHA256: sha)
-        k = try keys(out)
-        XCTAssertEqual(k.filter { $0 == DarkMode.darkKey }.count, 1)
-        XCTAssertEqual(k[k.firstIndex(of: 0x6000_6088)! + 1], 0x6000_60E4)
-        XCTAssertGreaterThan(Int(le32(out, 0x66c950)), info.patchAt)
-        XCTAssertNotEqual(le32(out, 0x66c950), darkSet)
-        XCTAssertLessThanOrEqual(out.count, ThemeImport.ososLimit)
-        // two times: the item exists already
-        XCTAssertThrowsError(try Patcher.apply(melody, to: out, originalSHA256: sha))
-        // a hook with "chain" is not a conflict; the same Settings item key is
-        XCTAssertTrue(Patcher.conflicts(melody + [dark]).isEmpty)
-        XCTAssertEqual(Patcher.conflicts(melody + melody).count, 1)
     }
 
     /// "menu_items": a copy of an item with a new label, after the item `after_label`, or at the end.
@@ -1981,8 +1643,7 @@ final class DarkModeTests: XCTestCase {
         XCTAssertThrowsError(try Patcher.insertMenuItem(menu, label: 0x7E03, template: 0x1111, after: nil))
     }
 
-    /// The album-artists patch: alone, after "Switch on iPod", and with something-comforting (both hook the
-    /// lookup with "chain"). The Music menu has "Album Artists" after Artists. Needs IPODFW_IPSW.
+    /// The album-artists patch: alone, and after "Switch on iPod" (it hooks the lookup with "chain"). The Music menu has "Album Artists" after Artists. Needs IPODFW_IPSW.
     func testAlbumArtistsMenuItem() throws {
         guard let ipsw = ProcessInfo.processInfo.environment["IPODFW_IPSW"] else { throw XCTSkip("set IPODFW_IPSW") }
         let partition = try FirmwarePartition(data: IPSW.extractFirmware(URL(fileURLWithPath: ipsw)).data)
@@ -1992,7 +1653,6 @@ final class DarkModeTests: XCTestCase {
         let all = Patcher.list(in: repo.appendingPathComponent("patches"))
         let dark = all.first { $0.spec.name == "dark-mode" }!
         let artists = all.filter { $0.spec.name == "album-artists" }
-        let melody = all.filter { $0.spec.name == "something-comforting" }
         XCTAssertEqual(artists.count, 1)
         func musicLabels(_ o: [UInt8], menu: Int16 = 24440) throws -> [UInt16] {
             let main = try Resources.mainBlock(Resources.scan(o, limit: Patcher.maxOSOSSize))
@@ -2012,16 +1672,16 @@ final class DarkModeTests: XCTestCase {
         XCTAssertEqual(rows[rows.firstIndex(of: 0xFF5E)! + 1], 0x7E04)
         XCTAssertGreaterThanOrEqual(le32(alone, 0x6776f8), Patcher.patchAreaStart)
         XCTAssertEqual(alone.count % 0x800, 0)
-        // after "Switch on iPod" with an empty theme, then something-comforting
+        // after "Switch on iPod" with an empty theme
         let theme = ImportedTheme(name: "empty", source_sha256: sha, osos_sha256: sha)
         let (switched, _) = try DarkMode.build(partition: partition, osos: osos, theme: theme, patch: dark, originalSHA256: sha)
-        let out = try Patcher.apply(artists + melody, to: switched, originalSHA256: sha)
+        let out = try Patcher.apply(artists, to: switched, originalSHA256: sha)
         labels = try musicLabels(out)
         XCTAssertEqual(labels.filter { $0 == 0x7E03 }.count, 1)
         XCTAssertLessThanOrEqual(out.count, ThemeImport.ososLimit)
         // two times: the item exists already
         XCTAssertThrowsError(try Patcher.apply(artists, to: alone, originalSHA256: sha))
-        XCTAssertTrue(Patcher.conflicts(artists + melody + [dark]).isEmpty)
+        XCTAssertTrue(Patcher.conflicts(artists + [dark]).isEmpty)
         XCTAssertEqual(Patcher.conflicts(artists + artists).count, 1)
     }
 
@@ -2577,8 +2237,8 @@ final class FirmwareManifestTests: XCTestCase {
         guard let ipsw = ProcessInfo.processInfo.environment["IPODFW_IPSW"] else { throw XCTSkip("set IPODFW_IPSW") }
         let osos = try FirmwarePartition(data: IPSW.extractFirmware(URL(fileURLWithPath: ipsw)).data).image("osos")
         let all = Patcher.list(in: PatchAndArtTests.repo.appendingPathComponent("patches"))
-        let set = all.filter { ["shuffle-fixes", "shuffle-album-mix", "something-comforting"].contains($0.spec.name) }
-        XCTAssertEqual(set.count, 3)
+        let set = all.filter { ["shuffle-fixes", "shuffle-album-mix"].contains($0.spec.name) }
+        XCTAssertEqual(set.count, 2)
 
         let stock = Patcher.detect(osos: osos, patches: all)
         XCTAssertTrue(stock.values.allSatisfy { $0 != .installed(version: nil) })
@@ -2588,7 +2248,6 @@ final class FirmwareManifestTests: XCTestCase {
         let found = Patcher.detect(osos: plain, patches: all)
         XCTAssertEqual(found["shuffle-fixes"], .installed(version: nil))
         XCTAssertEqual(found["shuffle-album-mix"], .installed(version: nil))
-        XCTAssertEqual(found["something-comforting"], .unknown)          // only shared (chain) hooks
         XCTAssertEqual(found["sleep-now"], .absent)
 
         let list = FirmwareManifest(app: "test", patches: set.map { .init(name: $0.spec.name, version: $0.spec.version) })
@@ -2596,7 +2255,7 @@ final class FirmwareManifestTests: XCTestCase {
         let built = try Patcher.apply(set, to: osos, list: bytes)
         XCTAssertEqual(FirmwareManifest.read(osos: built), list)
         let withList = Patcher.detect(osos: built, patches: all)
-        XCTAssertEqual(withList["something-comforting"], .installed(version: set.first { $0.spec.name == "something-comforting" }!.spec.version))
+        XCTAssertEqual(withList["shuffle-fixes"], .installed(version: set.first { $0.spec.name == "shuffle-fixes" }!.spec.version))
         XCTAssertEqual(withList["sleep-now"], .absent)
         // the patches are at the same places: the list goes after them
         XCTAssertEqual(Array(built.prefix(plain.count - 0x800)), Array(plain.prefix(plain.count - 0x800)))

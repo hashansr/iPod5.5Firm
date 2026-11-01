@@ -186,27 +186,10 @@ final class AppModel: ObservableObject {
     /// Increases when the app writes a theme file (an edit of a dark picture).
     @Published var themeRevision = 0
     @Published var thumbnailStatus: String?
-    /// The decoded USB log of the probe (nil: not read).
-    @Published var usbProbeLog: [USBProbeLog.Entry]?
-    @Published var batteryLog: String?
-    /// The text of the playback log (nil: not read; empty: the file has no log).
-    @Published var playbackLog: String?
-    /// The text of the diagnostic log (nil: not read; empty: the file has no log).
-    @Published var diagnosticLog: String?
-    /// The log files on the connected iPod.
-    @Published var ipodLogs: [IPodLogFile] = []
-    /// The log in `IPodLogSheet`.
-    @Published var shownLog: IPodLogFile?
     /// The playlists of the connected iPod and their thumbnails (album-art patch).
     @Published var playlistArt: [MusicImport.PlaylistArt] = []
     /// True after a change to a playlist image that is not yet in the thumbnail file on the iPod.
     @Published var playlistArtChanged = false
-    /// The playlists of the connected iPod that can go into a folder (playlist-folders patch).
-    @Published var folderPlaylists: [ITunesDB.PlaylistEntry] = []
-    /// The folders in the editor, and the folders in the file on the iPod.
-    @Published var playlistFolders = PlaylistFolders()
-    @Published var savedPlaylistFolders = PlaylistFolders()
-    @Published var playlistFoldersStatus: String?
     @Published var helperSetupError: String?
     @AppStorage("requireTouchID") var requireTouchID = true
     /// Settings > Updates: ask GitHub for a newer release at each launch.
@@ -548,7 +531,7 @@ final class AppModel: ObservableObject {
 
     /// true: a quit loses work: the firmware, text that is not applied, patch code or playlist folders.
     var hasUnsavedWork: Bool {
-        isDirty || pendingStringChanges > 0 || !codeDrafts.isEmpty || playlistFolders != savedPlaylistFolders
+        isDirty || pendingStringChanges > 0 || !codeDrafts.isEmpty
     }
 
     func confirmDiscard() -> Bool {
@@ -1070,11 +1053,6 @@ final class AppModel: ObservableObject {
                 try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
                 try w.data.write(to: url, options: .atomic)
             }
-            if action.write.contains(where: { $0.path == Self.usbProbeLogFile }) { usbProbeLog = nil }
-            if action.write.contains(where: { $0.path == Self.playbackLogFile }) { playbackLog = nil }
-            if action.write.contains(where: { $0.path == Self.diagnosticLogFile }) { diagnosticLog = nil }
-            if action.write.contains(where: { $0.path == Self.batteryLogFile }) { batteryLog = nil }
-            refreshIPodLogs()
             patchActionStatus[patch.spec.name] = "\(action.status ?? "\(action.title): complete.") (\(Date().formatted(date: .omitted, time: .shortened)))"
         } catch { fail("Cannot Write the File on the iPod", error) }
     }
@@ -1495,110 +1473,6 @@ final class AppModel: ObservableObject {
         } catch { fail("Cannot Write the Thumbnails", error) }
     }
 
-    /// The log of the usb-host-probe patch. The action in its patch.json makes it empty and writes the
-    /// trigger file; the patch writes the log on the iPod.
-    static let usbProbeLogFile = "iPod_Control/iTunes/iPodFirmUSBLog"
-
-    /// Finds the log files on the iPod. A file with no data gets no row.
-    func refreshIPodLogs() {
-        guard let volume = ipodMusicVolume() else { ipodLogs = []; return }
-        ipodLogs = IPodLogFile.Kind.allCases.compactMap { kind in
-            let path = volume.appendingPathComponent(Self.logFile(kind)).path
-            guard let info = try? FileManager.default.attributesOfItem(atPath: path),
-                  let bytes = info[.size] as? Int, bytes > 0 else { return nil }
-            return IPodLogFile(kind: kind, bytes: bytes, date: info[.modificationDate] as? Date)
-        }
-    }
-
-    func readUSBProbeLog() {
-        guard let volume = ipodMusicVolume() else {
-            alert = AlertInfo(title: "iPod Volume Not Found", message: "Connect the iPod so that it shows in Finder, then try again.")
-            return
-        }
-        guard let data = try? Data(contentsOf: volume.appendingPathComponent(Self.usbProbeLogFile)) else {
-            alert = AlertInfo(title: "No USB Log", message: "The iPod has no USB log. Click Start the Probe at the Next Restart. Then do the test.")
-            return
-        }
-        usbProbeLog = USBProbeLog.parse([UInt8](data)) ?? []
-    }
-
-    /// The logs of the playback-log and the diagnostic-log patches. The action in the patch.json makes
-    /// the file empty; the patch writes it on the iPod.
-    static let playbackLogFile = "iPod_Control/iTunes/iPodFirmPlaybackLog"
-    static let diagnosticLogFile = "iPod_Control/iTunes/iPodFirmDiagnosticLog"
-
-    static let batteryLogFile = "iPod_Control/iTunes/iPodFirmBatteryLog"
-
-    /// Read the text of the battery log. The file has zeros after the end of the text.
-    func readBatteryLog() {
-        guard let volume = ipodMusicVolume() else {
-            alert = AlertInfo(title: "iPod Volume Not Found", message: "Connect the iPod so that it shows in Finder. Then try again.")
-            return
-        }
-        guard let data = try? Data(contentsOf: volume.appendingPathComponent(Self.batteryLogFile)) else {
-            alert = AlertInfo(title: "No Battery Log", message: "The iPod has no battery log. Click Clear the Battery Log. Then do the test.")
-            return
-        }
-        batteryLog = String(decoding: data.prefix { $0 != 0 }, as: UTF8.self)
-    }
-
-    static func logFile(_ kind: IPodLogFile.Kind) -> String {
-        switch kind {
-        case .playback: playbackLogFile
-        case .diagnostic: diagnosticLogFile
-        case .usb: usbProbeLogFile
-        case .battery: batteryLogFile
-        }
-    }
-
-    /// The text of a log with songs: the playback log or the diagnostic log.
-    func songLog(_ kind: IPodLogFile.Kind) -> String? {
-        kind == .diagnostic ? diagnosticLog : playbackLog
-    }
-
-    func readSongLog(_ kind: IPodLogFile.Kind) {
-        let name = kind == .diagnostic ? "Diagnostic Log" : "Playback Log"
-        guard let volume = ipodMusicVolume() else {
-            alert = AlertInfo(title: "iPod Volume Not Found", message: "Connect the iPod so that it shows in Finder. Then try again.")
-            return
-        }
-        guard let data = try? Data(contentsOf: volume.appendingPathComponent(Self.logFile(kind))) else {
-            alert = AlertInfo(title: "No \(name)", message: "The iPod has no \(name.lowercased()). Click Clear the \(name). Then do the test.")
-            return
-        }
-        var letters: [String: String] = [:]
-        for p in Self.patchLibrary.list() { if let l = p.spec.version_letter { letters[p.spec.name] = l } }
-        let database = (try? Data(contentsOf: volume.appendingPathComponent("iPod_Control/iTunes/iTunesDB"))).map { [UInt8]($0) } ?? []
-        let text = PlaybackLog.text([UInt8](data), letters: letters, songs: ITunesDB.readTrackInfo(database)) ?? ""
-        if kind == .diagnostic { diagnosticLog = text } else { playbackLog = text }
-    }
-
-    /// Save a log as a text file, then show the file in Finder. Returns the file, or nil.
-    @discardableResult
-    func saveSongLog(_ kind: IPodLogFile.Kind) -> URL? {
-        let name = kind == .diagnostic ? "Diagnostic Log" : "Playback Log"
-        guard let log = songLog(kind), !log.isEmpty else { return nil }
-        let s = NSSavePanel()
-        s.nameFieldStringValue = PlaybackLog.fileName(name: name)
-        s.allowedContentTypes = [.plainText]
-        s.message = "Save the \(name.lowercased()) as a text file. Then send the file to the developer."
-        guard s.runModal() == .OK, let url = s.url else { return nil }
-        do {
-            try ("iPodFirm on the Mac: \(version)\n" + log + "\n").write(to: url, atomically: true, encoding: .utf8)
-        } catch {
-            fail("Cannot Save the \(name)", error)
-            return nil
-        }
-        NSWorkspace.shared.activateFileViewerSelecting([url])
-        return url
-    }
-
-    /// Save a log, then open a new issue on GitHub. The owner of the log drags the file into the issue.
-    func reportSongLog(_ kind: IPodLogFile.Kind) {
-        guard let log = songLog(kind), let url = saveSongLog(kind) else { return }
-        NSWorkspace.shared.open(PlaybackLog.issueURL(log: log, appVersion: version, fileName: url.lastPathComponent, diagnostic: kind == .diagnostic))
-    }
-
     /// Read the playlists of the connected iPod and their images.
     func loadPlaylists() async {
         guard let volume = ipodMusicVolume() else { playlistArt = []; return }
@@ -1628,56 +1502,6 @@ final class AppModel: ObservableObject {
             playlistArtChanged = true
             await loadPlaylists()
         } catch { fail("Cannot Remove the Playlist Image", error) }
-    }
-
-    // MARK: playlist folders
-
-    /// Read the playlists and the folder file of the connected iPod.
-    func loadPlaylistFolders() async {
-        guard let volume = ipodMusicVolume() else {
-            folderPlaylists = []
-            playlistFolders = PlaylistFolders()
-            savedPlaylistFolders = PlaylistFolders()
-            return
-        }
-        let r = await Task.detached(priority: .userInitiated) { () -> ([ITunesDB.PlaylistEntry], PlaylistFolders) in
-            let db = (try? Data(contentsOf: volume.appendingPathComponent("iPod_Control/iTunes/iTunesDB"))).map { [UInt8]($0) } ?? []
-            return (ITunesDB.readPlaylistEntries(db).filter { !$0.isPodcast }, PlaylistFolders.read(volume: volume))
-        }.value
-        folderPlaylists = r.0
-        var folders = r.1
-        folders.removeMissing(Set(r.0.map(\.persistentID)))
-        savedPlaylistFolders = r.1
-        playlistFolders = folders
-        playlistFoldersStatus = nil
-    }
-
-    /// The problems that stop a write of the folders.
-    var playlistFolderProblems: [String] {
-        playlistFolders.problems(playlistNames: folderPlaylists.map(\.name))
-    }
-
-    /// Write the folder file to the iPod.
-    func writePlaylistFolders() async {
-        guard let volume = ipodMusicVolume() else {
-            alert = AlertInfo(title: "iPod Volume Not Found", message: "Connect the iPod so that it shows in Finder. Then try again.")
-            return
-        }
-        let folders = playlistFolders
-        // Saved for later: the folder colours. The app wrote the thumbnail file again, so that
-        // the folders got their colour squares. The squares did not show on the real iPod.
-        // Refer to re/playlist-folders.md, "Folder colours".
-        // let art = volume.appendingPathComponent("iPod_Control/iTunes/\(AlbumArt.fileName)")
-        // let hasArt = FileManager.default.fileExists(atPath: art.path)
-        do {
-            try await work("Writing the playlist folders to the iPod…") {
-                try folders.write(volume: volume)
-                // if hasArt { _ = try MusicImport.writeThumbnails(volume: volume) }
-            }
-            savedPlaylistFolders = folders
-            let time = Date().formatted(date: .abbreviated, time: .shortened)
-            playlistFoldersStatus = "The iPod has \(counted(folders.folders.count, "folder")) (\(time)). Eject the iPod to see the change."
-        } catch { fail("Cannot Write the Playlist Folders", error) }
     }
 
     // MARK: pictures
@@ -1773,7 +1597,6 @@ final class AppModel: ObservableObject {
         } catch { fail("Cannot List Disks", error) }
         refreshBackups()
         await readIPodLibraryName()
-        refreshIPodLogs()
         // A different iPod (or none): the old state is not valid. Read the new iPod.
         guard busy == nil else { return }
         guard let ipod = currentIPod, !currentIPodIsUnsupported else { ipodState = nil; ipodReadStatus = nil; return }

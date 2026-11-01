@@ -177,27 +177,9 @@ The `ui` object gives a patch controls in the Patches pane with no change to the
 | `toggles` | Switches. Each switch has `title`, `path`, `on` and `off`. The switch reads the file on the iPod and writes `on` or `off`. |
 | `steps_title`, `steps` | A numbered list in a disclosure group. The default title is "Procedure". A click on the title or on the chevron opens and closes the list (`TitleDisclosure`). |
 | `readme` | The name of a Markdown file in the patch folder. The pane shows it in the section "Read Me". |
-| `tools` | Built-in Swift tools, by id: `album-thumbnails` (the thumbnails and the playlist artwork), `usb-log` (the USB log), `playlist-folders` (the folder editor), `playback-log` (the playback log), `diagnostic-log` (the diagnostic log) and `battery-log` (the battery log). `PatchSpec.knownTools` lists them. |
+| `tools` | Built-in Swift tools, by id: `album-thumbnails` (the thumbnails and the playlist artwork). `PatchSpec.knownTools` lists them. |
 
 Each `path` must start with `iPod_Control/` and must not contain `..`. A write can have a maximum of 1 MB (`PatchUI.maxWrite`).
-
-Example (a part of [patches/usb-host-probe/patch.json](../patches/usb-host-probe/patch.json)):
-
-```json
-"ui": {
-  "actions": [{
-    "title": "Start the Probe at the Next Restart",
-    "write": [
-      { "path": "iPod_Control/iTunes/iPodFirmUSBLog", "zeros": 32768 },
-      { "path": "iPod_Control/iTunes/iPodFirmUSBProbe", "text": "1" }
-    ],
-    "status": "The probe starts at the first button press after the next restart of the iPod."
-  }],
-  "steps_title": "Test Procedure",
-  "steps": ["Flash a firmware with this patch.", "…"],
-  "tools": ["usb-log"]
-}
-```
 
 Example (a part of [patches/flash-keep-awake/patch.json](../patches/flash-keep-awake/patch.json)):
 
@@ -380,18 +362,12 @@ Apple's code ends at 0x7358c0. The bytes `55 AA 55 AA` at 0x7358c0 are a marker.
 | `dark-mode` | Set by the build | After the theme data, below 0x7F8000 | The value 0x7eb000 in `patch.json` is not used. |
 | `album-art` | `extended` | After all other data (16412 bytes). Alone: 0x736800–0x73a81c. The album table, the thumbnails, the cache and a 20000-byte read buffer come from the allocator | Extended patch since version 2.0. The draw loop `shrink` is fast code; the other functions use `__attribute__((minsize))`. |
 | `usb-audio-out` | `extended` | After all other data (15924 bytes), then three menus: Settings, the main menu and Settings > Main Menu. The control page, the siTDs and the music buffers (52 KB) come from 0xad80c | Extended patch. |
-| `usb-host-probe` | `extended` | After all other data (22248 bytes; the 32 KB log buffer and the 40 KB of the isochronous test come from allocators) | Extended patch. Test patch. |
-| `playback-log` | `extended` | After all other data (38849 bytes; the 32 KB log buffer is in the patch, `.bss`) | Extended patch. Test patch. |
-| `diagnostic-log` | `extended` | After all other data (41768 bytes; the 32 KB log buffer is in the patch, `.bss`) | Extended patch. Test patch. |
-| `something-comforting` | `extended` | After all other data (692 bytes), then the Settings menu (19 items, 764 bytes). Alone: code 0x736800–0x736ab4, menu at 0x737000, osos end 0x737800 | Extended patch. Example patch. |
 | `album-artists` | `extended` | After all other data (3688 bytes), then three menus: Music (11 items, 444 bytes), the main menu (32 items, 1284 bytes) and Settings > Main Menu (29 items, 1164 bytes). Alone: code 0x736800–0x737668, menus at 0x737800, 0x738000 and 0x738800, osos end 0x739000 | Extended patch. The side table and the list come from the allocators. |
-| `instant-save` | `extended` | After all other data (36 bytes). Alone: 0x736800–0x736824, osos end 0x737000 | Extended patch. |
 | `shuffle-fixes` | `extended` | After all other data (64 bytes). Alone: 0x736800–0x736840, osos end 0x737000 | Extended patch. It also changes 4 words in Apple's code (`bytes`). |
 | `shuffle-album-mix` | `extended` | After all other data (1615 bytes), then two menus: the main menu (32 items, 1284 bytes) and Settings > Main Menu (29 items, 1164 bytes). After `shuffle-fixes`: code 0x736840–0x736e8f, menus at 0x736e90 and 0x7373a0, osos end 0x738000 | Extended patch. It needs `shuffle-fixes`. It also changes 1 word (`bytes`). |
 | `cover-flow` | `extended` | After all other data (11384 bytes; approximately 600 KB for the screen copy, the covers and the read buffer come from the allocator while Cover Flow shows) | Extended patch. |
 | `up-next` | `extended` | After all other data (1807 bytes), then the Settings menu (19 items, 764 bytes). Alone: code 0x736800–0x736f0f, menu at 0x736f10, osos end 0x737800 | Extended patch. |
 | `custom-eq` | `extended` | After all other data (1690 bytes, with 1000 bytes of filter records and 350 bytes for the list of EQs). | Extended patch. It also changes 2 words (`bytes`). |
-| `playlist-folders` | `extended` | After all other data (3980 bytes; the 64 KB file buffer, the folder table and the views come from the allocator). Alone: code 0x736800–0x73778c, osos end 0x737800 | Extended patch. |
 
 The variables of a patch are in its area. The firmware loads osos into RAM, so the variables can change. Apple's code does not use this RAM.
 

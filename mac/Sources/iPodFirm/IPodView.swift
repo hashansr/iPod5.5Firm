@@ -13,7 +13,7 @@ struct IPodView: View {
             macColumn
                 .frame(minWidth: 340, idealWidth: 400, maxWidth: .infinity, maxHeight: .infinity)
         }
-        .onAppear { model.refreshBackups(); model.recheckFullDiskAccess(); model.refreshIPodLogs() }
+        .onAppear { model.refreshBackups(); model.recheckFullDiskAccess() }
         .onChange(of: model.selectedIPod) { Task { await model.refreshIPods() } }
     }
 
@@ -66,9 +66,6 @@ struct IPodView: View {
                 Section {
                     IPodPatchesSection()
                 } header: { Text("Patches on This iPod") }
-                Section {
-                    IPodLogsSection()
-                } header: { Text("Logs on This iPod") }
             }
         }
         .formStyle(.grouped)
@@ -185,24 +182,6 @@ extension IPodPatchesSection {
             (AppModel.Appearance(rawValue: a)?.title ?? a) + (list.theme.map { ": \($0)" } ?? "")
         } ?? "Not known"
         return [("Appearance", appearance), ("Made with iPodFirm", list.app)]
-    }
-}
-
-/// The logs on the connected iPod. A log shows here also if its patch is off in the app.
-struct IPodLogsSection: View {
-    @EnvironmentObject var model: AppModel
-
-    var body: some View {
-        if model.ipodLogs.isEmpty {
-            Text("The iPod has no logs.").foregroundStyle(.secondary)
-        }
-        ForEach(model.ipodLogs) { log in
-            HStack {
-                Text(log.title).help(log.details)
-                Spacer()
-                Button("Show Log") { model.shownLog = log }
-            }
-        }
     }
 }
 
