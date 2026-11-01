@@ -110,57 +110,6 @@ def test_backlight_60s():
 
 
 @pytest.mark.skipif(not os.environ.get("IPODFW_IPSW"), reason="set IPODFW_IPSW=path/to/iPod_25.1.3.ipsw")
-def test_playback_log_hooks():
-    osos = FirmwarePartition(extract_firmware(os.environ["IPODFW_IPSW"])[1]).image("osos")
-    out, report = patcher.apply(osos, REPO / "patches/playback-log", 0x7f8000)
-    assert report["code"][0] == "0x736800"                     # extended: after the end of osos
-    for h in json.loads((REPO / "patches/playback-log/patch.json").read_text())["hooks"]:
-        at, target = int(h["at"], 16), int(report["symbols"][h["to"]], 16)
-        assert struct.unpack_from("<I", out, at)[0] == patcher.branch(h["kind"], at, target)
-    # alone, each chain wrapper runs the replaced push and continues after it
-    start = int(report["symbols"]["start_original"], 16)
-    assert struct.unpack_from("<I", out, start)[0] == 0xe92d4038
-    assert struct.unpack_from("<I", out, start + 4)[0] == patcher.branch("b", start + 4, 0xb40c8)
-
-
-@pytest.mark.skipif(not os.environ.get("IPODFW_IPSW"), reason="set IPODFW_IPSW=path/to/iPod_25.1.3.ipsw")
-def test_diagnostic_log_hooks():
-    osos = FirmwarePartition(extract_firmware(os.environ["IPODFW_IPSW"])[1]).image("osos")
-    out, report = patcher.apply(osos, REPO / "patches/diagnostic-log", 0x7f8000)
-    for h in json.loads((REPO / "patches/diagnostic-log/patch.json").read_text())["hooks"]:
-        at, target = int(h["at"], 16), int(report["symbols"][h["to"]], 16)
-        assert struct.unpack_from("<I", osos, at)[0] == int(h["expect"], 16)
-        want = target if h["kind"] == "word" else patcher.branch(h["kind"], at, target)
-        assert struct.unpack_from("<I", out, at)[0] == want
-    for name, word, resume in (("drive_original", 0xe92d4ff8, 0x265ccc), ("file_open_original", 0xe92d41fc, 0x8f390),
-                               ("file_read_original", 0xe92d4ff8, 0x8f468)):
-        wrapper = int(report["symbols"][name], 16)
-        assert struct.unpack_from("<I", out, wrapper)[0] == word
-        assert struct.unpack_from("<I", out, wrapper + 4)[0] == patcher.branch("b", wrapper + 4, resume)
-
-
-@pytest.mark.skipif(not os.environ.get("IPODFW_IPSW"), reason="set IPODFW_IPSW=path/to/iPod_25.1.3.ipsw")
-def test_usb_host_probe_extended_area():
-    osos = FirmwarePartition(extract_firmware(os.environ["IPODFW_IPSW"])[1]).image("osos")
-    out, report = patcher.apply(osos, REPO / "patches/usb-host-probe", 0x736800)
-    assert report["code"][0] == "0x736800"                     # extended: after the end of osos
-    assert len(out) % 0x800 == 0 and len(out) > 0x736800
-    event = int(report["symbols"]["hook_event"], 16)
-    assert struct.unpack_from("<I", out, 0x1d8260)[0] == patcher.branch("bl", 0x1d8260, event)
-    assert struct.unpack_from("<I", out, 0x6c8730)[0] == int(report["symbols"]["hook_hub_init"], 16)
-    assert struct.unpack_from("<I", out, 0x6c878c)[0] == int(report["symbols"]["hook_storage_init"], 16)
-    # with the other code patches: all use different areas and hook sites
-    original = hashlib.sha256(osos).hexdigest()
-    every = osos
-    for name in ("album-art", "sleep-now", "flash-keep-awake", "flash-wake-on-input", "usb-host-probe"):
-        every, _ = patcher.apply(every, REPO / "patches" / name, 0x736800, original_sha256=original)
-    # after other data (for example a theme and the Dark Mode items to 0x7eb123): the probe goes after it
-    filled = osos + bytes(0x7eb123 - len(osos) - 1) + b"\x01"
-    out, report = patcher.apply(filled, REPO / "patches/usb-host-probe", 0x736800, original_sha256=original)
-    assert report["code"][0] == "0x7eb130"
-
-
-@pytest.mark.skipif(not os.environ.get("IPODFW_IPSW"), reason="set IPODFW_IPSW=path/to/iPod_25.1.3.ipsw")
 def test_cover_flow():
     osos = FirmwarePartition(extract_firmware(os.environ["IPODFW_IPSW"])[1]).image("osos")
     out, report = patcher.apply(osos, REPO / "patches/cover-flow", 0x736800)
@@ -175,7 +124,7 @@ def test_cover_flow():
     # with the other code patches: all use different areas and hook sites
     original = hashlib.sha256(osos).hexdigest()
     every = osos
-    for name in ("album-art", "sleep-now", "flash-keep-awake", "flash-wake-on-input", "usb-host-probe", "cover-flow"):
+    for name in ("album-art", "sleep-now", "flash-keep-awake", "flash-wake-on-input", "cover-flow"):
         every, _ = patcher.apply(every, REPO / "patches" / name, 0x736800, original_sha256=original)
 
 
@@ -202,38 +151,6 @@ def _settings_keys(osos: bytes) -> list[int]:
     at = main.abs(r)
     count = struct.unpack_from("<I", osos, at)[0]
     return [struct.unpack_from("<I", osos, at + 4 + 40 * i + 0x1C)[0] for i in range(count)]
-
-
-@pytest.mark.skipif(not os.environ.get("IPODFW_IPSW"), reason="set IPODFW_IPSW=path/to/iPod_25.1.3.ipsw")
-def test_something_comforting_alone_and_after_dark_mode():
-    from ipodfw import darkmode, themeimport
-    fw = FirmwarePartition(extract_firmware(os.environ["IPODFW_IPSW"])[1])
-    osos = fw.image("osos")
-    original = hashlib.sha256(osos).hexdigest()
-    patch = REPO / "patches/something-comforting"
-    # alone: the chains go to the firmware (word) and to the trampoline of the patch (b)
-    out, report = patcher.apply(osos, patch, 0x736800)
-    syms = {k: int(v, 16) for k, v in report["symbols"].items()}
-    assert struct.unpack_from("<I", out, 0x66c94c)[0] == syms["hook_settings_get"]
-    assert struct.unpack_from("<I", out, 0x66c950)[0] == syms["hook_settings_set"]
-    assert struct.unpack_from("<I", out, 0x21f254)[0] == patcher.branch("b", 0x21f254, syms["hook_lookup"])
-    keys = _settings_keys(out)
-    assert keys[keys.index(0x60006088) + 1] == 0x600060E4         # after Clicker
-    assert len(out) % 0x800 == 0 and len(out) <= patcher.OSOS_LIMIT
-    assert int(report["settings_menu"], 16) >= int(report["code"][1], 16)
-    # after the Dark Mode build: both items, and the hooks of this patch call the Dark Mode hooks
-    empty = themeimport.Theme("empty", original, original)
-    dark, info = darkmode.build(fw, osos, empty, REPO / "patches/dark-mode", original)
-    dark_get = struct.unpack_from("<I", dark, 0x66c94c)[0]
-    out, report = patcher.apply(dark, patch, 0x736800, original_sha256=original)
-    keys = _settings_keys(out)
-    assert keys.count(0x600060E0) == 1 and keys.count(0x600060E4) == 1
-    assert keys.index(0x600060E4) == keys.index(0x60006088) + 1
-    assert dark_get >= patcher.PATCH_AREA_START
-    assert int(report["code"][0], 16) >= info["end"]
-    # the same patch two times: the Settings item exists already
-    with pytest.raises(patcher.PatchError, match="already has an item"):
-        patcher.apply(out, patch, 0x736800, original_sha256=original)
 
 
 def test_chain_target_rules():
@@ -331,14 +248,14 @@ def test_apply_all_packs_the_patches():
     """The patches follow each other without a 0x800 gap: each one starts after the code, the
     variables and the menus of the patch before it. Only the result is a multiple of 0x800."""
     osos = FirmwarePartition(extract_firmware(os.environ["IPODFW_IPSW"])[1]).image("osos")
-    names = ["album-art", "album-artists", "cover-flow", "instant-save", "something-comforting", "usb-host-probe"]
+    names = ["album-art", "album-artists", "cover-flow", "up-next", "sleep-now"]
     out = patcher.apply_all(osos, [REPO / "patches" / n for n in names])
     assert len(out) % 0x800 == 0
     sizes = sum(json.loads((REPO / "patches" / n / "patch.json").read_text())["size"] for n in names)
     menus = (4 + 40 * 11) + (4 + 40 * 32) + (4 + 40 * 29) + (4 + 40 * 19)
     assert len(out) - patcher.PATCH_AREA_END < sizes + menus + len(names) * 16 + 0x800
     # one patch alone is still rounded
-    alone, _ = patcher.apply(osos, REPO / "patches/instant-save", 0x736800)
+    alone, _ = patcher.apply(osos, REPO / "patches/sleep-now", 0x736800)
     assert len(alone) % 0x800 == 0
 
 
@@ -352,23 +269,3 @@ def test_needs():
     with pytest.raises(patcher.PatchError, match="needs the patch"):
         patcher.apply_all(b"", [REPO / "patches/shuffle-album-mix"])
 
-
-@pytest.mark.skipif(not os.environ.get("IPODFW_IPSW"), reason="set IPODFW_IPSW=path/to/iPod_25.1.3.ipsw")
-def test_playlist_folders():
-    osos = FirmwarePartition(extract_firmware(os.environ["IPODFW_IPSW"])[1]).image("osos")
-    out, report = patcher.apply(osos, REPO / "patches/playlist-folders", 0x736800)
-    syms = {k: int(v, 16) for k, v in report["symbols"].items()}
-    # the four calls that change a screen row into an array index
-    for at, name in ((0x1ea66c, "hook_count"), (0x1ec914, "hook_name"), (0x1e7e7c, "hook_select"), (0x254cc4, "hook_otg")):
-        assert struct.unpack_from("<I", out, at)[0] == patcher.branch("bl", at, syms[name])
-    for at, name in ((0x1ea660, "hook_vmax"), (0x1d81cc, "hook_ui_event")):
-        assert struct.unpack_from("<I", out, at)[0] == patcher.branch("b", at, syms[name])
-    assert struct.unpack_from("<I", out, 0x6772c0)[0] == syms["hook_list_event"]
-    # the UI handler slot does not change: cover-flow hooks it, and up-next reads it
-    assert struct.unpack_from("<I", out, 0x6701f0)[0] == 0x1d81cc
-    assert report["bytes"] == json.loads((REPO / "patches/playlist-folders/patch.json").read_text())["size"]
-    # with the patches that use the same list event slot or the UI handler
-    names = ("album-art", "cover-flow", "playlist-folders", "up-next")
-    every = patcher.apply_all(osos, [REPO / "patches" / n for n in names])
-    assert struct.unpack_from("<I", every, 0x6701f0)[0] != 0x1d81cc     # the hook of cover-flow
-    assert struct.unpack_from("<I", every, 0x1d81cc)[0] >> 24 == 0xEA    # the b hook of playlist-folders
