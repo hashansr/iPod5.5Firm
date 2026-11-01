@@ -57,7 +57,7 @@ enum HelperClient {
         conn.remoteObjectInterface = NSXPCInterface(with: HelperXPCProtocol.self)
         if let team = ownTeamIdentifier() {
             // make sure we are talking to our own helper
-            conn.setCodeSigningRequirement(signingRequirement(identifier: "com.thefauxdreamer.ipodfirm.helper", team: team))
+            conn.setCodeSigningRequirement(signingRequirement(identifier: helperMachService, team: team))
         }
         conn.resume()
         defer { conn.invalidate() }

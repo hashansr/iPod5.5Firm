@@ -21,7 +21,7 @@ A user patch with the name of a built-in patch replaces the built-in patch only 
 
 ### The .ipodpatch file
 
-A `.ipodpatch` file is a zip of one patch folder (`ditto -c -k --keepParent`). macOS opens it with iPodFirm (the type `com.thefauxdreamer.ipodfirm.patch` in `Info.plist`).
+A `.ipodpatch` file is a zip of one patch folder (`ditto -c -k --keepParent`). macOS opens it with iPodFirm (the type `com.hashansr.ipodfirm.patch` in `Info.plist`).
 
 To install a patch, do one of these steps:
 

@@ -2923,3 +2923,43 @@ final class ThemeKeepAppleTests: XCTestCase {
         XCTAssertNil(gray.keep_apple)
     }
 }
+
+/// The one-time copy of the settings of the original iPodFirm.
+final class SettingsMigrationTests: XCTestCase {
+    private func defaults() -> UserDefaults {
+        let name = "ipodfirm-test-\(UUID().uuidString)"
+        let d = UserDefaults(suiteName: name)!
+        addTeardownBlock { d.removePersistentDomain(forName: name) }
+        return d
+    }
+
+    func testCopyTakesTheSwitchesAndNotTheTheme() {
+        let d = defaults()
+        let old: [String: Any] = ["enabledPatches": ["album-art"], "appearance": "switch", "darkTheme": "Dark Gray",
+                                  "acceptedDisclaimerVersion": 1, "patchOptions": ["up-next": ["hold": 1]]]
+        SettingsMigration.copy(old, to: d)
+        XCTAssertEqual(d.stringArray(forKey: "enabledPatches"), ["album-art"])
+        XCTAssertEqual(d.string(forKey: "appearance"), "switch")
+        XCTAssertNil(d.string(forKey: "darkTheme"))
+        XCTAssertNil(d.object(forKey: "acceptedDisclaimerVersion"))
+    }
+
+    func testCopyDoesNotReplaceASettingOfThisApp() {
+        let d = defaults()
+        d.set("light", forKey: "appearance")
+        SettingsMigration.copy(["appearance": "switch"], to: d)
+        XCTAssertEqual(d.string(forKey: "appearance"), "light")
+    }
+
+    func testRunDoesNothingInTheOriginalApp() {
+        let d = defaults()
+        SettingsMigration.run(defaults: d, bundleID: SettingsMigration.originalDomain)
+        XCTAssertFalse(d.bool(forKey: SettingsMigration.doneKey))
+    }
+
+    func testRunMarksTheCopyAsDone() {
+        let d = defaults()
+        SettingsMigration.run(defaults: d, bundleID: "com.hashansr.ipodfirm")
+        XCTAssertTrue(d.bool(forKey: SettingsMigration.doneKey))
+    }
+}

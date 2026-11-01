@@ -3,9 +3,9 @@ import Security
 
 // Shared between the app and the privileged helper daemon (registered with SMAppService).
 
-public let helperMachService = "com.thefauxdreamer.ipodfirm.helper"
-public let helperPlistName = "com.thefauxdreamer.ipodfirm.helper.plist"
-public let appBundleIdentifier = "com.thefauxdreamer.ipodfirm"
+public let helperMachService = "com.hashansr.ipodfirm.helper"
+public let helperPlistName = "com.hashansr.ipodfirm.helper.plist"
+public let appBundleIdentifier = "com.hashansr.ipodfirm"
 /// Bump when the XPC protocol changes.
 public let helperProtocolVersion = 3
 /// The first protocol version with `readOSOS`.

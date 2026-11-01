@@ -26,7 +26,7 @@ public enum AppLog {
     static let maxSteps = 50
 
     static let queue = DispatchQueue(label: "iPodFirm.AppLog")
-    static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.thefauxdreamer.ipodfirm", category: "app")
+    static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? appBundleIdentifier, category: "app")
     private static var steps: [(date: Date, text: String)] = []
 
     /// The most recent log. A rotation starts a new file with this name.

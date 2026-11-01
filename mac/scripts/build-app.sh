@@ -46,7 +46,7 @@ cp "$BIN/iPodFirm" "$BIN/ipodfw-helper" "$APP/Contents/MacOS/"
 # names stay for crash reports.
 strip -S "$APP/Contents/MacOS/iPodFirm" "$APP/Contents/MacOS/ipodfw-helper"
 mkdir -p "$APP/Contents/Library/LaunchDaemons"
-cp Resources/com.thefauxdreamer.ipodfirm.helper.plist "$APP/Contents/Library/LaunchDaemons/"
+cp Resources/com.hashansr.ipodfirm.helper.plist "$APP/Contents/Library/LaunchDaemons/"
 # The built-in themes. Format 2 does not store the bytes that a theme replaces, so the app
 # can ship them (refer to re/dark-theme.md).
 mkdir -p "$APP/Contents/Resources/Themes"
@@ -72,7 +72,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <dict>
     <key>CFBundleName</key><string>$APP_NAME</string>
     <key>CFBundleDisplayName</key><string>$APP_NAME</string>
-    <key>CFBundleIdentifier</key><string>com.thefauxdreamer.ipodfirm</string>
+    <key>CFBundleIdentifier</key><string>com.hashansr.ipodfirm</string>
     <key>CFBundleExecutable</key><string>iPodFirm</string>
     <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>CFBundlePackageType</key><string>APPL</string>
@@ -94,14 +94,14 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>UTExportedTypeDeclarations</key>
     <array>
         <dict>
-            <key>UTTypeIdentifier</key><string>com.thefauxdreamer.ipodfirm.patch</string>
+            <key>UTTypeIdentifier</key><string>com.hashansr.ipodfirm.patch</string>
             <key>UTTypeDescription</key><string>iPodFirm Patch</string>
             <key>UTTypeConformsTo</key><array><string>public.zip-archive</string></array>
             <key>UTTypeTagSpecification</key>
             <dict><key>public.filename-extension</key><array><string>ipodpatch</string></array></dict>
         </dict>
         <dict>
-            <key>UTTypeIdentifier</key><string>com.thefauxdreamer.ipodfirm.eq</string>
+            <key>UTTypeIdentifier</key><string>com.hashansr.ipodfirm.eq</string>
             <key>UTTypeDescription</key><string>iPodFirm Custom EQ</string>
             <key>UTTypeConformsTo</key><array><string>public.json</string></array>
             <key>UTTypeTagSpecification</key>
@@ -114,13 +114,13 @@ cat > "$APP/Contents/Info.plist" <<PLIST
             <key>CFBundleTypeName</key><string>iPodFirm Patch</string>
             <key>CFBundleTypeRole</key><string>Viewer</string>
             <key>LSHandlerRank</key><string>Owner</string>
-            <key>LSItemContentTypes</key><array><string>com.thefauxdreamer.ipodfirm.patch</string></array>
+            <key>LSItemContentTypes</key><array><string>com.hashansr.ipodfirm.patch</string></array>
         </dict>
         <dict>
             <key>CFBundleTypeName</key><string>iPodFirm Custom EQ</string>
             <key>CFBundleTypeRole</key><string>Viewer</string>
             <key>LSHandlerRank</key><string>Owner</string>
-            <key>LSItemContentTypes</key><array><string>com.thefauxdreamer.ipodfirm.eq</string></array>
+            <key>LSItemContentTypes</key><array><string>com.hashansr.ipodfirm.eq</string></array>
         </dict>
     </array>
 </dict>
@@ -129,7 +129,7 @@ PLIST
 
 sign_app() {    # $1 = the app, $2 = the identity
     # The hardened runtime stops the injection of code into the app and into the helper.
-    codesign --force --options runtime --sign "$2" --identifier com.thefauxdreamer.ipodfirm.helper "$1/Contents/MacOS/ipodfw-helper"
+    codesign --force --options runtime --sign "$2" --identifier com.hashansr.ipodfirm.helper "$1/Contents/MacOS/ipodfw-helper"
     codesign --force --options runtime --sign "$2" "$1"
     codesign --verify --strict "$1"
 }

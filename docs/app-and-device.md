@@ -64,7 +64,7 @@ If the user does not allow notifications, the app shows an alert with the same b
 
 #### The log and the fault report
 
-The app keeps a log. [AppLog.swift](../mac/Sources/IPodFWKit/AppLog.swift) writes each line to `~/Library/Logs/iPodFirm/iPodFirm.log` and to the unified log of macOS. Console.app shows the lines with the subsystem `com.thefauxdreamer.ipodfirm`. At 1 MB, the file becomes `iPodFirm.1.log`, and a new file starts. The app keeps only these two files.
+The app keeps a log. [AppLog.swift](../mac/Sources/IPodFWKit/AppLog.swift) writes each line to `~/Library/Logs/iPodFirm/iPodFirm.log` and to the unified log of macOS. Console.app shows the lines with the subsystem `com.hashansr.ipodfirm`. At 1 MB, the file becomes `iPodFirm.1.log`, and a new file starts. The app keeps only these two files.
 
 The log records these items:
 
@@ -100,10 +100,12 @@ The Emulator pane shows the iPod at a fixed size (370 × 620 points) in the cent
 
 1. It increases the version and the build number in [mac/version.env](../mac/version.env).
 2. It runs `swift build -c release --arch arm64` with the option `-file-prefix-map <project folder>=.`. The compiler then writes `./mac/Sources/...` in place of the full path of each source file. Thus the build does not change with the location of the project folder.
-3. It makes `iPodFirm.app` with the app, the helper, the launchd property list, the emulator files and the patches.
+3. It makes `iPodFirm.app` with the app, the helper, the launchd property list, the themes and the patches.
 4. It runs `strip -S` on the app and on the helper. This removes the debug map of the linker. The app does not use it.
-5. It writes `Info.plist`. The bundle identifier is `com.thefauxdreamer.ipodfirm`.
-6. It signs the helper with the identifier `com.thefauxdreamer.ipodfirm.helper`, then the app. It uses the first "Apple Development" or "Developer ID Application" identity, or `CODESIGN_IDENTITY`. It turns on the hardened runtime (`--options runtime`) for the two programs.
+5. It writes `Info.plist`. The bundle identifier is `com.hashansr.ipodfirm`. The original iPodFirm uses `com.thefauxdreamer.ipodfirm`. The two apps do not share settings, the helper or the file types. They still share the folder `~/Library/Application Support/iPodFirm` (backups, themes, patches and the Apple firmware).
+   - At the first start, `SettingsMigration` copies the patch switches, the appearance and the other settings of the original app. It does not copy the selected dark theme or the acceptance of the disclaimer. The copy happens one time.
+   - The new helper needs a new approval: System Settings > General > Login Items & Extensions. Without it, the app asks for the administrator password.
+6. It signs the helper with the identifier `com.hashansr.ipodfirm.helper`, then the app. It uses the first "Apple Development" or "Developer ID Application" identity, or `CODESIGN_IDENTITY`. It turns on the hardened runtime (`--options runtime`) for the two programs.
 7. It writes the new numbers to `version.env` only after a successful build.
 8. It quits iPodFirm with `osascript` if iPodFirm is open. Then it installs the app in `/Applications`.
 
@@ -165,16 +167,16 @@ The raw disk `/dev/rdiskN` needs root rights. The app itself never opens the raw
 ### Mode 1: the launchd daemon (Touch ID)
 
 1. The owner clicks "Set Up Touch ID" in the Settings window (Permissions).
-2. The app registers the daemon with `SMAppService.daemon(plistName: "com.thefauxdreamer.ipodfirm.helper.plist")`.
+2. The app registers the daemon with `SMAppService.daemon(plistName: "com.hashansr.ipodfirm.helper.plist")`.
 3. macOS asks the owner to approve the daemon in System Settings > General > Login Items.
-4. launchd starts `ipodfw-helper --daemon` when the app connects to the Mach service `com.thefauxdreamer.ipodfirm.helper`.
+4. launchd starts `ipodfw-helper --daemon` when the app connects to the Mach service `com.hashansr.ipodfirm.helper`.
 5. Before each write, the app asks for Touch ID (`LAContext.evaluatePolicy(.deviceOwnerAuthentication)`). The owner can switch this off (`requireTouchID`).
 6. The daemon stops after 60 seconds without a request.
 
 Both sides of the XPC connection examine the code signature:
 
-- The daemon accepts only the code `identifier "com.thefauxdreamer.ipodfirm"`, signed by the same team (`setCodeSigningRequirement`).
-- The app accepts only the helper `identifier "com.thefauxdreamer.ipodfirm.helper"`, signed by the same team.
+- The daemon accepts only the code `identifier "com.hashansr.ipodfirm"`, signed by the same team (`setCodeSigningRequirement`).
+- The app accepts only the helper `identifier "com.hashansr.ipodfirm.helper"`, signed by the same team.
 - The daemon refuses to start if it has no team identifier (an ad-hoc signature).
 
 The app and the helper use the hardened runtime. The app needs no entitlement. Thus another program cannot inject code into the app and use the connection to the daemon.

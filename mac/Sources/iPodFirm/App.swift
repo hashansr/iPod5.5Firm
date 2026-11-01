@@ -9,6 +9,11 @@ struct IPodFirmApp: App {
     @StateObject private var emulator = EmulatorManager()
     @StateObject private var session = EmulatorSession()
 
+    init() {
+        // Before AppModel reads the settings.
+        SettingsMigration.run()
+    }
+
     var body: some Scene {
         WindowGroup("iPodFirm") {
             ContentView()
