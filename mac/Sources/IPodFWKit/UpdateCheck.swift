@@ -16,10 +16,19 @@ public enum UpdateCheck {
         }
     }
 
-    /// The project on GitHub. The playback log opens a new issue here.
-    public static let repository = URL(string: "https://github.com/TheFauxDreamer/iPod5.5Firm")!
+    /// The owner and the name of the project on GitHub. This is the fork of the owner of this build,
+    /// not the original project: the update check must not offer the release of another project.
+    static let owner = "hashansr"
+    static let name = "iPod5.5Firm"
+    /// The project on GitHub. A fault report opens a new issue here.
+    public static let repository = URL(string: "https://github.com/\(owner)/\(name)")!
     /// GitHub gives the newest release that is not a draft and not a pre-release.
-    public static let latestURL = URL(string: "https://api.github.com/repos/TheFauxDreamer/iPod5.5Firm/releases/latest")!
+    public static let latestURL = URL(string: "https://api.github.com/repos/\(owner)/\(name)/releases/latest")!
+
+    /// True if `url` is a page of this project on GitHub. The app opens only such a page.
+    public static func isProjectPage(_ url: URL) -> Bool {
+        url.scheme == "https" && url.host == "github.com" && url.path.hasPrefix("/\(owner)/\(name)/")
+    }
 
     private struct Reply: Decodable {
         let tag_name: String
@@ -29,6 +38,7 @@ public enum UpdateCheck {
     /// Decodes the JSON reply of `latestURL`.
     public static func parse(_ data: Data) throws -> Release {
         let reply = try JSONDecoder().decode(Reply.self, from: data)
+        guard isProjectPage(reply.html_url) else { throw FirmwareError("The release page is not a page of this project.") }
         var version = reply.tag_name
         if version.hasPrefix("v") || version.hasPrefix("V") { version.removeFirst() }
         return Release(version: version, url: reply.html_url)

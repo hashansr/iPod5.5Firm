@@ -76,20 +76,10 @@ struct EmulatorView: View {
                             Label("The emulator is not installed", systemImage: "exclamationmark.circle").labelStyle(StatusLabelStyle(tint: .orange))
                         }
                         Spacer()
-                        Button(emu.installedVersion == nil ? "Install Emulator" : "Update Emulator") { emu.install() }
-                            .disabled(emu.installing || session.isActive)
-                            .help("iPodFirm builds the emulator from the source of siggifly/ipod-emulator. It installs Rust in your home folder if necessary. The emulator has no sound and no USB.")
                     }
-                    if emu.installing || !emu.log.isEmpty {
-                        ScrollViewReader { proxy in
-                            ScrollView {
-                                Text(emu.log).font(.system(.caption, design: .monospaced))
-                                    .frame(maxWidth: .infinity, alignment: .leading).textSelection(.enabled)
-                                Color.clear.frame(height: 1).id("end")
-                            }
-                            .frame(height: 140)
-                            .onChange(of: emu.log) { _, _ in proxy.scrollTo("end") }
-                        }
+                    if emu.installedVersion == nil {
+                        Text("iPodFirm does not install the emulator. Build siggifly/ipod-emulator in the folder emulator-src of the iPodFirm support folder. Then put ipod-emulator.app in /Applications.")
+                            .font(.callout).foregroundStyle(.secondary).textSelection(.enabled)
                     }
                 } header: { Text("Emulator") }
             }

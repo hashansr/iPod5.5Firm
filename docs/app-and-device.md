@@ -292,12 +292,11 @@ The Patches pane shows the result:
 | `/usr/bin/ditto` | `IPSW.unpack` | `-x -k IPSW DIR` | Extract an `.ipsw` file. |
 | `/usr/bin/ditto` | `PatchLibrary.inspect`, `PatchLibrary.export` | `-x -k FILE DIR`, `-c -k --keepParent DIR FILE` | Open and make a `.ipodpatch` file. |
 | `/usr/bin/zip` | `IPSW.repack` | `-q -X -r OUT .` | Make an `.ipsw` file. |
-| `/bin/bash` | `EmulatorManager.install` | `install-emulator.sh` | Install the emulator. |
 | `ipod-boot` | `EmulatorManager` | `make-disk IPSW DRIVE`, `put-files DRIVE DIR /iPod_Control` | Make the emulator drive. |
 | `ipod-emulator` | `EmulatorSession` | `--headless=… --control=/tmp/ipodfirm-UID.sock` | Run the emulator without a window. |
 | `ipod-emulator.app` | `EmulatorManager.openWindow` | `--cold` | Open the emulator window. |
 
-`install-emulator.sh` runs these programs: `curl` (rustup, only if Rust is not installed), `git clone` or `git pull`, `git apply` (the iPodFirm patches), `cargo build --release -p ipod-gui -p ipod-machine` and `ditto`.
+The app does not install the emulator. An installer that downloaded and built unpinned code was removed.
 
 ## System APIs
 
@@ -327,12 +326,9 @@ The Patches pane shows the result:
 | URL | When | Check |
 |---|---|---|
 | `http://appldnld.apple.com.edgesuite.net/content.info.apple.com/iPod/SBML/osx/bundles/061-2967.20080313.Cnvkg/iPod_25.1.3.ipsw` | "Download Apple Firmware 1.3", and each action that needs the Apple file if no correct copy is cached. | SHA-256 must be `840b2480ad5b692c098cb772c3d2bf8f58bf37557788782b596ac01c27ecdc32`. Apple serves this file only over HTTP, so `Info.plist` has an App Transport Security exception for this domain. |
-| `https://api.github.com/repos/TheFauxDreamer/iPod5.5Firm/releases/latest` | At each launch if Settings > Updates > "Check for a new version at launch" is on. iPodFirm > Check for Updates…. | TLS 1.2 or later. HTTP status 200 and JSON with `tag_name` and `html_url`. The app compares `tag_name` (without the `v`) with `CFBundleShortVersionString`. If the release is newer, the notification opens `html_url` in the browser. The app does not download the update. |
+| `https://api.github.com/repos/hashansr/iPod5.5Firm/releases/latest` | At each launch if Settings > Updates > "Check for a new version at launch" is on. iPodFirm > Check for Updates…. | TLS 1.2 or later. HTTP status 200 and JSON with `tag_name` and `html_url`. The app compares `tag_name` (without the `v`) with `CFBundleShortVersionString`. If the release is newer, the notification opens `html_url` in the browser. The app does not download the update. |
 | `https://github.com/TheFauxDreamer/iPod5.5Firm/issues/new?title=…&body=…` | "Report on GitHub…" in the alert of a fault. Help > Report a Problem on GitHub…. | The app does not connect. It opens the address in the browser (`NSWorkspace.open`). The body starts with the instruction to attach the log. Then it has the fault, a short summary of the app and the iPod, the first lines of the error and the last three steps (`AppLog.issueURL`). It has a maximum of 1500 characters. The app cuts the end of a longer text. The user must sign in to GitHub and attach the saved log file. |
 | `https://github.com/TheFauxDreamer/iPod5.5Firm/issues/new?title=…&body=…` | Patches > Playback Log or Diagnostic Log > "Report on GitHub…". | The app does not connect. It opens the address in the browser (`NSWorkspace.open`). The body has the app version and the information lines of the playback log: the RAM, the free memory and the patches. It has a maximum of 1500 characters. The owner of the log must sign in to GitHub and attach the text file. |
-| `https://sh.rustup.rs` | "Install Emulator", only if `~/.cargo/bin/cargo` does not exist. | TLS 1.2 or later. |
-| `https://github.com/siggifly/ipod-emulator.git` | "Install Emulator". | Git over HTTPS. |
-| crates.io (through `cargo`) | "Install Emulator". | Cargo lock file of the emulator. |
 
 The app makes no other network connections. It sends no data about the owner or the iPod. "Report on GitHub…" only opens a web page. The user decides to send it. The update check sends only a GET request with the default `User-Agent` of `URLSession`.
 
@@ -404,7 +400,7 @@ The app reads `iPod_Control/iTunes/iTunesDB` and the music files. It does not ch
 
 ## The emulator
 
-The Emulator pane uses [siggifly/ipod-emulator](https://github.com/siggifly/ipod-emulator), built from source. iPodFirm adds the patch [0001-ipodfirm-instrumentation.patch](../mac/Resources/emulator-patches/0001-ipodfirm-instrumentation.patch) before the build. Refer to [re/emulator.md](../re/emulator.md).
+The Emulator pane uses [siggifly/ipod-emulator](https://github.com/siggifly/ipod-emulator), which the owner builds from source. The patch [0001-ipodfirm-instrumentation.patch](../mac/Resources/emulator-patches/0001-ipodfirm-instrumentation.patch) is for the owner to apply before the build. The app does not apply it. Refer to [re/emulator.md](../re/emulator.md).
 
 "Run in Emulator" does these steps:
 

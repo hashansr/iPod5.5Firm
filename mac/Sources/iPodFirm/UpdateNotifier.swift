@@ -53,7 +53,7 @@ final class UpdateNotifier: NSObject, UNUserNotificationCenterDelegate {
         case Self.skipAction:
             if let version = info["version"] as? String { UserDefaults.standard.set(version, forKey: Self.skippedKey) }
         case Self.openAction, UNNotificationDefaultActionIdentifier:
-            if let s = info["url"] as? String, let url = URL(string: s) { NSWorkspace.shared.open(url) }
+            if let s = info["url"] as? String, let url = URL(string: s), UpdateCheck.isProjectPage(url) { NSWorkspace.shared.open(url) }
         default:
             break
         }

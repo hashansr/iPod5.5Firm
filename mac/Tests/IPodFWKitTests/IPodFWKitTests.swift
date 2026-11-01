@@ -2704,11 +2704,24 @@ final class UpdateCheckTests: XCTestCase {
 
     /// The reply of the GitHub API gives the version without the "v" and the release page.
     func testUpdateReleaseParse() throws {
-        let json = #"{"tag_name":"v0.1.180","name":"v0.1.180","html_url":"https://github.com/TheFauxDreamer/iPod5.5Firm/releases/tag/v0.1.180","draft":false}"#
+        let json = #"{"tag_name":"v0.1.180","name":"v0.1.180","html_url":"https://github.com/hashansr/iPod5.5Firm/releases/tag/v0.1.180","draft":false}"#
         let release = try UpdateCheck.parse(Data(json.utf8))
         XCTAssertEqual(release.version, "0.1.180")
-        XCTAssertEqual(release.url.absoluteString, "https://github.com/TheFauxDreamer/iPod5.5Firm/releases/tag/v0.1.180")
+        XCTAssertEqual(release.url.absoluteString, "https://github.com/hashansr/iPod5.5Firm/releases/tag/v0.1.180")
         XCTAssertThrowsError(try UpdateCheck.parse(Data("{}".utf8)))
+    }
+
+    /// The app opens only a page of this project. A release page of another project, another host or
+    /// another scheme gives an error.
+    func testUpdateReleasePageMustBeThisProject() {
+        for url in ["https://github.com/TheFauxDreamer/iPod5.5Firm/releases/tag/v0.1.180",
+                    "https://github.com/hashansr/iPod5.5Firm-evil/releases/tag/v1",
+                    "https://example.com/hashansr/iPod5.5Firm/releases/tag/v1",
+                    "http://github.com/hashansr/iPod5.5Firm/releases/tag/v1",
+                    "file:///hashansr/iPod5.5Firm/releases/tag/v1"] {
+            let json = #"{"tag_name":"v0.1.180","html_url":"\#(url)"}"#
+            XCTAssertThrowsError(try UpdateCheck.parse(Data(json.utf8)), url)
+        }
     }
 }
 

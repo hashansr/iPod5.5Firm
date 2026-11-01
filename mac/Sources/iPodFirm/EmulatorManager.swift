@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 import IPodFWKit
 
-/// Installs/updates siggifly/ipod-emulator from source, and boots a customised firmware in it:
+/// Boots a customised firmware in siggifly/ipod-emulator, which the owner installs without iPodFirm:
 /// builds a drive with the emulator's own `ipod-boot make-disk`, points an "iPodFirm Test" device at
 /// that drive in the emulator's (documented, hand-editable) settings.txt, and cold-boots it.
 @MainActor
@@ -17,8 +17,6 @@ final class EmulatorManager: ObservableObject {
     nonisolated static let deviceName = "iPodFirm Test"
     nonisolated static let diskName = "ipodfirm-custom"
 
-    @Published var log = ""
-    @Published var installing = false
     @Published var installedVersion: String?
     @Published var lastRun: Date?
 
@@ -31,46 +29,6 @@ final class EmulatorManager: ObservableObject {
     }
 
     var toolsReady: Bool { installedVersion != nil && FileManager.default.isExecutableFile(atPath: Self.ipodBoot.path) }
-
-    var installScript: URL? { Bundle.main.url(forResource: "install-emulator", withExtension: "sh") }
-
-    func install() {
-        guard !installing, let script = installScript else { return }
-        installing = true
-        log = ""
-        let p = Process()
-        p.executableURL = URL(fileURLWithPath: "/bin/bash")
-        p.arguments = [script.path]
-        var env = ProcessInfo.processInfo.environment
-        env["PATH"] = "\(NSHomeDirectory())/.cargo/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin"
-        p.environment = env
-        let pipe = Pipe()
-        p.standardOutput = pipe
-        p.standardError = pipe
-        pipe.fileHandleForReading.readabilityHandler = { h in
-            let text = String(decoding: h.availableData, as: UTF8.self)
-            guard !text.isEmpty else { return }
-            Task { @MainActor in self.append(text) }
-        }
-        p.terminationHandler = { proc in
-            Task { @MainActor in
-                pipe.fileHandleForReading.readabilityHandler = nil
-                self.installing = false
-                self.append(proc.terminationStatus == 0 ? "\n✓ Done.\n" : "\n✗ Failed (exit \(proc.terminationStatus)).\n")
-                self.refresh()
-            }
-        }
-        do { try p.run() } catch {
-            AppLog.warning("Cannot start the emulator installer\n" + AppLog.describe(error))
-            installing = false
-            append("Cannot start the installer: \(error.localizedDescription)\n")
-        }
-    }
-
-    private func append(_ text: String) {
-        log += text
-        if log.count > 200_000 { log = String(log.suffix(150_000)) }
-    }
 
     // MARK: run
 
@@ -100,7 +58,7 @@ final class EmulatorManager: ObservableObject {
     }
 
     func prepare(firmware: [UInt8], ososLength: Int, originalIPSW: URL, library: Library) async throws {
-        guard toolsReady else { throw FirmwareError("Install the emulator first (Emulator pane).") }
+        guard toolsReady else { throw FirmwareError("The emulator is not installed. Refer to the Emulator pane.") }
         try await quitEmulator()
         let ipsw = Self.workDir.appendingPathComponent("iPodFirm custom.ipsw")
         let drive = Self.profile.appendingPathComponent("drives/\(Self.diskName).img")

@@ -4,7 +4,7 @@
 
 ## Method 1: the Emulator pane of iPodFirm
 
-1. Click "Install Emulator". The app builds [siggifly/ipod-emulator](https://github.com/siggifly/ipod-emulator) from source and installs `/Applications/ipod-emulator.app`. If Rust is not installed, the script installs it in your home folder.
+1. Build [siggifly/ipod-emulator](https://github.com/siggifly/ipod-emulator) from source in `~/Library/Application Support/iPodFirm/emulator-src`. Install `/Applications/ipod-emulator.app`. The app does not do this for you.
 2. Click "Run in Emulator". The app does these steps:
    - It puts your changed osos into the Apple firmware 1.3 and makes a drive with `ipod-boot make-disk`.
    - It starts the drive from cold in a private profile (`IPOD_EMULATOR_DATA=~/Library/Application Support/iPodFirm/EmulatorProfile`). Your own emulator devices do not change.
@@ -99,4 +99,4 @@ The instruction count stops while the emulated iPod sleeps. Thus use the emulate
 
 CAUTION: The emulated start writes 4 to `DEV_RS` several times. These writes are start checks that pass on the hardware. Thus set `IPODFW_RESET_AFTER` to a value after the start, for example 1000000000.
 
-Only a build from `install-emulator.sh` has these additions. A release download does not have them. The script keeps its build in `~/Library/Application Support/iPodFirm/emulator-src/target/release/`.
+Only a build that has the patches of `mac/Resources/emulator-patches` has these additions. A release download does not have them. The build must be in `~/Library/Application Support/iPodFirm/emulator-src/target/release/`.
