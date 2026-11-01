@@ -26,7 +26,7 @@ All addresses are osos offsets for Apple firmware 1.3. Refer to [The address rul
 | [custom-eq](#custom-eq) | Code patch (extended) | Patches | 1 `bl`, 1 `b`, 2 words (`bytes`) | Version 0.1: yes, a basic test by the owner. Version 0.2 and later: no |
 | [usb-audio-out](#usb-audio-out) | Code patch | Patches | 17 `bl`, 2 `b` and 4 words (3 with `chain`), a Settings menu | Yes (2026-10-17) |
 | [Dark theme](#dark-theme) | Resource data | Patches > iPod Appearance | BMap, View and Type bytes | Yes |
-| [Dark Mode switch](#dark-mode-switch) | Code and data | Patches > iPod Appearance | 1 `b` and 2 vtable words, a table and a menu | Version 1.1: yes (28 October 2026) |
+| [Dark Mode switch](#dark-mode-switch) | Code and data | Patches > iPod Appearance | 1 `b` and 2 vtable words, a compressed table and a menu | Version 1.1: yes (28 October 2026). Version 2.0: not tested on a real iPod |
 | [Move of rsrc](#move-of-rsrc) | Partition layout | Automatic | 1 directory entry | Yes |
 
 ## The build sequence
@@ -867,7 +867,7 @@ An earlier version read the ATA IDENTIFY data in the firmware (a hook at 0x142f9
 - The Layout control: Stock or Split. Refer to [Split layout](#split-layout).
 - The "Dark theme" picker, "Show Import Report" and "Delete Theme…". "Delete Theme…" asks for a confirmation.
 
-**Built-in themes.** The app has two themes in [themes/](../themes/). "Dark Gray" is the default (`AppModel.defaultThemeName`). "Classic Dark" is too large for "Switch on iPod": with no other patch, the code of `dark-mode` ends 29,425 bytes after 0x7F8000 (measured on 2 November 2026). Use Classic Dark with the appearance Dark. Classic Dark comes from the dark builder of the owner. Refer to [../re/classic-dark.md](../re/classic-dark.md). It differs from Dark Gray in these points:
+**Built-in themes.** The app has two themes in [themes/](../themes/). "Classic Dark" is the default (`AppModel.defaultThemeName`). "Dark Gray" is the older theme. Both fit "Switch on iPod" since patch version 2.0. Classic Dark comes from the dark builder of the owner. Refer to [../re/classic-dark.md](../re/classic-dark.md). It differs from Dark Gray in these points:
 
 - The theme file has `"keep_apple": []`. Thus the theme keeps its own progress bar pictures (BMap 24342 and 24343). Dark Gray has no `keep_apple` list and keeps Apple's pictures (`ThemeImport.keepApple`).
 - The theme file changes the table entry of View 24529 (the charging screen). The entry points at a new element list: a black background and the battery box. The change has the label "View 24529 (table entry)".
@@ -951,24 +951,44 @@ In the Pictures pane, the "Dark Theme" switch shows the theme pictures. "Replace
 3. The new Settings menu (Menu 24598), aligned to 16 bytes. The resource table entry points to it.
 4. The code of the `dark-mode` patch, aligned to 16 bytes. The build gives the symbol `dark_table` the address of the switch table.
 
-The switch table has this format (little-endian):
+The switch table has this format (little-endian). Version 2.0 of the patch replaced the older table "IFDM" with this one:
 
 | Field | Content |
 |---|---|
-| u32 | `IFDM` (0x4D444649) |
+| u32 | `IFD2` (0x32444649) |
 | u32 | Count N |
-| u32 | Offset of the data, from the start of the table |
-| N × {u32, u32} | {osos address, length} |
-| data | For each change: old XOR new |
+| u32 | Total size of the table |
+| N entries | The new bytes of one change (see below) |
 
-The XOR data switches the bytes in both directions. A change that the owner edited is left out.
+Each entry has these parts:
+
+| Part | Content |
+|---|---|
+| varint | The address, as a step from the end of the previous entry. Zigzag: 0, −1, 1, −2 … are 0, 1, 2, 3 … The first entry counts from 0. |
+| varint | The length × 2, plus 1 if the bytes are an LZ4 block |
+| varint | The size of the LZ4 block (only with an LZ4 block) |
+| bytes | The LZ4 block, or the bytes |
+
+A varint has 7 bits in each byte, low bits first. A byte with bit 7 set has a next byte. The builder uses an LZ4 block only if it is smaller than the bytes. The table holds the new bytes, not old XOR new. The iPod loads the light osos from the flash at each start, so the patch only changes light to dark. A change that the owner edited is left out.
+
+The builders use the same simple LZ4 compressor: `darkmode.lz4_compress` in [darkmode.py](../src/ipodfw/darkmode.py) and `DarkMode.lz4Compress` in [DarkMode.swift](../mac/Sources/IPodFWKit/DarkMode.swift). Both give the same bytes (the tests `test_lz4_roundtrip_and_known_bytes` and `testLZ4KnownBytes`).
+
+**Decoder.** `walk_table` in [dark_mode.c](../patches/dark-mode/dark_mode.c) goes through the table two times. The first time it changes nothing and examines each entry. The second time it writes. The patch stops at the first pass if one of these is true:
+
+- The table does not start with `IFD2`, or its size is wrong.
+- A varint is not complete.
+- An address or a length is not below 0x800000.
+- An entry would change the table.
+- An LZ4 block reads or writes outside its range, or does not give exactly the length.
+
+The iPod then starts in the light mode. The test `test_decoder_in_dark_mode_c_agrees_with_python_and_refuses_bad_tables` compiles this part of `dark_mode.c` with a host compiler and the address sanitizer. It gives 401 tables, one correct and the others with errors. The C code and the Python decoder give the same bytes, and a refused table changes no byte.
 
 **Size.** Patches pane > iPod Appearance > Dark Theme shows the new space for each appearance:
 
 - "Size on iPod (Dark)": the theme data after 0x736800 (`ImportedTheme.addedSize`).
 - "Size on iPod (Switch on iPod)": items 1 to 4 above, with the alignment (`DarkMode.addedSize`). It needs the open firmware 1.3.
 
-The tooltip of the row "Size on iPod (Dark)" gives the bytes inside osos that the theme changes (`ImportedTheme.changedSize`). These changes use no new space. The measured values for the theme "Dark Gray" are 38,428 bytes (Dark), 738,593 bytes (Switch on iPod) and 660,678 changed bytes. The limit of the area is 792,576 bytes (0x736800–0x7F8000; 759,808 bytes before 9 October 2026). The test `testExtendedPatchAfterSwitchBuild` makes sure that `DarkMode.addedSize` agrees with `DarkMode.build`.
+The tooltip of the row "Size on iPod (Dark)" gives the bytes inside osos that the theme changes (`ImportedTheme.changedSize`). These changes use no new space. The measured values for the theme "Dark Gray" are 38,428 bytes (Dark), 311,296 bytes (Switch on iPod, with the compressed table of patch version 2.0; it was 738,593 bytes with the XOR table of version 1.1) and 660,678 changed bytes. For "Classic Dark" the table has 275,992 bytes and "Switch on iPod" adds 317,440 bytes. The limit of the area is 792,576 bytes (0x736800–0x7F8000; 759,808 bytes before 9 October 2026). The test `testExtendedPatchAfterSwitchBuild` makes sure that `DarkMode.addedSize` agrees with `DarkMode.build`.
 
 The new Settings menu is a copy of the Apple menu with one more item after Clicker (key 0x60006088). The new item is a copy of the Sound Check item (key 0x600060b7) with the key 0x600060e0 and the label ID 0x7e00.
 

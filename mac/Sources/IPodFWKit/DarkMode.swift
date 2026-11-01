@@ -10,13 +10,13 @@ import Foundation
 //
 // The build puts these items after the end of osos (below ThemeImport.ososLimit):
 //   the theme data outside osos (for example the background picture: in both modes)
-//   the switch table: "IFDM", u32 count N, u32 data offset, N x {u32 address, u32 length}, data
-//                     (old XOR new for each change, so the same table switches in both directions)
+//   the switch table: "IFD2", u32 count N, u32 total size, N entries with the new bytes of one change
+//                     each, as an LZ4 block or as bytes (refer to `switchTable`)
 //   the Settings menu with the Dark Mode item (the resource table entry points to it)
 //   the code of the patch (its symbol dark_table is the address of the table)
 
 public enum DarkMode {
-    public static let magic: UInt32 = 0x4D44_4649                 // "IFDM"
+    public static let magic: UInt32 = 0x3244_4649                 // "IFD2"
     static let settingsMenu = ThemeImport.Key(block: "main", type: "Menu", id: 24598)
     static let templateKey: UInt32 = 0x6000_60B7                  // the Sound Check item: an On/Off item
     static let insertAfterKey: UInt32 = 0x6000_6088               // the Clicker item
@@ -64,12 +64,119 @@ public enum DarkMode {
         return (at, light, moved.changes[1], extra)
     }
 
+    static func varint(_ value: Int) -> [UInt8] {
+        var out: [UInt8] = [], v = value
+        while v >= 0x80 { out.append(UInt8(v & 0x7F | 0x80)); v >>= 7 }
+        out.append(UInt8(v))
+        return out
+    }
+
+    static func readVarint(_ d: [UInt8], _ pos: inout Int) throws -> Int {
+        var v = 0, shift = 0
+        while true {
+            guard pos < d.count, shift <= 28 else { throw ThemeError("The switch table is not correct.") }
+            let b = d[pos]
+            pos += 1
+            v |= Int(b & 0x7F) << shift
+            if b & 0x80 == 0 { return v }
+            shift += 7
+        }
+    }
+
+    /// The bytes after a nibble of 15. `n` is the value minus 15.
+    private static func lz4Extra(_ out: inout [UInt8], _ n: Int) {
+        var n = n
+        while n >= 255 { out.append(255); n -= 255 }
+        out.append(UInt8(n))
+    }
+
+    /// One LZ4 sequence. `length` is the match length (at least 4), or 0 for the last sequence.
+    private static func lz4Sequence(_ out: inout [UInt8], _ literals: ArraySlice<UInt8>, _ offset: Int, _ length: Int) {
+        let lit = literals.count, match = max(length - 4, 0)
+        out.append(UInt8(min(lit, 15) << 4 | (length > 0 ? min(match, 15) : 0)))
+        if lit >= 15 { lz4Extra(&out, lit - 15) }
+        out += literals
+        if length > 0 {
+            out.append(UInt8(offset & 0xFF)); out.append(UInt8(offset >> 8))
+            if match >= 15 { lz4Extra(&out, match - 15) }
+        }
+    }
+
+    /// An LZ4 block. The algorithm is simple, and the Python version (darkmode.lz4_compress) is the same,
+    /// so both give the same bytes: a table of 4096 positions, a hash of 4 bytes, the first match, no
+    /// search inside a match. The last 5 bytes are bytes, and no match starts in the last 12 bytes.
+    public static func lz4Compress(_ src: [UInt8]) -> [UInt8] {
+        let n = src.count
+        var out: [UInt8] = []
+        out.reserveCapacity(n / 2 + 16)
+        var table = [Int32](repeating: -1, count: 4096)
+        var anchor = 0, ip = 0
+        let startLimit = n - 12, endLimit = n - 5
+        func read32(_ i: Int) -> UInt32 {
+            UInt32(src[i]) | UInt32(src[i + 1]) << 8 | UInt32(src[i + 2]) << 16 | UInt32(src[i + 3]) << 24
+        }
+        while ip < startLimit {
+            let v = read32(ip)
+            let h = Int((v &* 2_654_435_761) >> 20)
+            let ref = Int(table[h])
+            table[h] = Int32(ip)
+            if ref >= 0 && ip - ref <= 65535 && read32(ref) == v {
+                var length = 4
+                while ip + length < endLimit && src[ref + length] == src[ip + length] { length += 1 }
+                lz4Sequence(&out, src[anchor..<ip], ip - ref, length)
+                ip += length
+                anchor = ip
+            } else {
+                ip += 1
+            }
+        }
+        lz4Sequence(&out, src[anchor...], 0, 0)
+        return out
+    }
+
+    /// The reference decoder (the patch does the same). Throws if the block is not correct.
+    public static func lz4Decompress(_ block: [UInt8], length: Int) throws -> [UInt8] {
+        let bad = ThemeError("An LZ4 block is not correct.")
+        var out: [UInt8] = []
+        var pos = 0
+        func next() throws -> Int {
+            guard pos < block.count else { throw bad }
+            pos += 1
+            return Int(block[pos - 1])
+        }
+        while pos < block.count {
+            let token = try next()
+            var lit = token >> 4, match = token & 15
+            if lit == 15 {
+                while true { let b = try next(); lit += b; if b != 255 { break } }
+            }
+            guard pos + lit <= block.count else { throw bad }
+            out += block[pos..<pos + lit]
+            pos += lit
+            if pos == block.count { break }
+            let low = try next(), high = try next()
+            let offset = low | high << 8
+            guard offset != 0, offset <= out.count else { throw bad }
+            if match == 15 {
+                while true { let b = try next(); match += b; if b != 255 { break } }
+            }
+            for _ in 0..<match + 4 { out.append(out[out.count - offset]) }
+        }
+        guard out.count == length else { throw ThemeError("An LZ4 block has the wrong length.") }
+        return out
+    }
+
     /// The switch table for the changes inside osos, with the rules of `ImportedTheme.apply`: a change
     /// is used if the bytes are the old bytes, and left out if they are already the new bytes (the same
     /// change two times) or other bytes (an edit by the owner).
+    ///
+    /// The table holds the new bytes (the patch only changes the light osos to the dark osos):
+    /// "IFD2", u32 count, u32 total size, then for each change: varint zigzag(address - end of the
+    /// previous change), varint length * 2 + (1 if LZ4), varint size of the LZ4 block (only with LZ4),
+    /// the block or the bytes.
     public static func switchTable(_ theme: ImportedTheme, osos: [UInt8],
                                    extra: [LayoutRun] = []) -> (table: [UInt8], leftOut: Int) {
-        var runs: [UInt8] = [], data: [UInt8] = [], count = 0, leftOut = 0
+        var changes: [(at: Int, new: [UInt8])] = [], leftOut = 0
         var work = osos
         for c in theme.withOldBytes(osos).effectiveChanges where c.offset + c.old.count <= osos.count {
             let cur = work[c.offset..<c.offset + c.old.count]
@@ -78,33 +185,44 @@ public enum DarkMode {
                 continue
             }
             work.replaceSubrange(c.offset..<c.offset + c.new.count, with: c.new)
-            var run = [UInt8](repeating: 0, count: 8)
-            put32(&run, 0, UInt32(c.offset)); put32(&run, 4, UInt32(c.new.count))
-            runs += run
-            data += zip(c.old, c.new).map { $0 ^ $1 }
-            count += 1
+            changes.append((c.offset, [UInt8](c.new)))
         }
-        for e in extra {
-            var run = [UInt8](repeating: 0, count: 8)
-            put32(&run, 0, UInt32(e.at)); put32(&run, 4, UInt32(e.new.count))
-            runs += run
-            data += zip(e.old, e.new).map { $0 ^ $1 }
-            count += 1
+        for e in extra { changes.append((e.at, e.new)) }
+        var body: [UInt8] = []
+        var prevEnd = 0
+        for (at, new) in changes {
+            let delta = at - prevEnd
+            body += varint(delta >= 0 ? delta << 1 : ((-delta - 1) << 1) | 1)
+            let packed = lz4Compress(new)
+            if packed.count < new.count {
+                body += varint(new.count * 2 + 1) + varint(packed.count) + packed
+            } else {
+                body += varint(new.count * 2) + new
+            }
+            prevEnd = at + new.count
         }
         var head = [UInt8](repeating: 0, count: 12)
-        put32(&head, 0, magic); put32(&head, 4, UInt32(count)); put32(&head, 8, UInt32(12 + 8 * count))
-        return (head + runs + data, leftOut)
+        put32(&head, 0, magic); put32(&head, 4, UInt32(changes.count)); put32(&head, 8, UInt32(12 + body.count))
+        return (head + body, leftOut)
     }
 
-    /// What the patch does at the start (for tests).
-    public static func applySwitchTable(_ osos: inout [UInt8], _ table: [UInt8]) {
-        let n = Int(le32(table, 4))
-        var dataAt = Int(le32(table, 8))
-        for i in 0..<n {
-            let at = Int(le32(table, 12 + 8 * i)), length = Int(le32(table, 16 + 8 * i))
-            for k in 0..<length { osos[at + k] ^= table[dataAt + k] }
-            dataAt += length
+    /// What the patch does at the start (for tests). Throws if the table is not correct.
+    public static func applySwitchTable(_ osos: inout [UInt8], _ table: [UInt8]) throws {
+        let bad = ThemeError("The switch table is not correct.")
+        guard table.count >= 12, le32(table, 0) == magic, Int(le32(table, 8)) == table.count else { throw bad }
+        var pos = 12, prevEnd = 0
+        for _ in 0..<Int(le32(table, 4)) {
+            let zz = try readVarint(table, &pos), len2 = try readVarint(table, &pos)
+            let length = len2 >> 1
+            let size = len2 & 1 == 1 ? try readVarint(table, &pos) : length
+            let at = prevEnd + ((zz >> 1) ^ -(zz & 1))
+            guard at >= 0, at + length <= osos.count, pos + size <= table.count else { throw bad }
+            let data = Array(table[pos..<pos + size])
+            osos.replaceSubrange(at..<at + length, with: len2 & 1 == 1 ? try lz4Decompress(data, length: length) : data)
+            pos += size
+            prevEnd = at + length
         }
+        guard pos == table.count else { throw bad }
     }
 
     /// Menu 24598 with a Dark Mode item after Clicker (a copy of the Sound Check item).

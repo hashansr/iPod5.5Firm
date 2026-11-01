@@ -1701,7 +1701,7 @@ final class DarkModeTests: XCTestCase {
         XCTAssertEqual(try Patcher.chainTarget(b, in: osos, patchSymbols: ["orig": 0x7E_C000]), 0x7E_B100)
     }
 
-    func testSwitchTableSwitchesBothWaysAndKeepsEdits() {
+    func testSwitchTableGivesTheDarkBytesAndKeepsEdits() throws {
         let osos = (0..<64).map { UInt8($0) }
         func change(_ r: String, _ at: Int, _ old: [UInt8], _ new: [UInt8]) -> ThemeChange {
             ThemeChange(resource: r, offset: at, old: Data(old), new: Data(new))
@@ -1712,10 +1712,33 @@ final class DarkModeTests: XCTestCase {
         let (table, leftOut) = DarkMode.switchTable(theme, osos: osos)
         XCTAssertEqual(leftOut, 1)
         var dark = osos
-        DarkMode.applySwitchTable(&dark, table)
+        try DarkMode.applySwitchTable(&dark, table)
         XCTAssertEqual(Array(dark[4..<7]), [9, 9, 9]); XCTAssertEqual(Array(dark[20..<22]), [0, 0]); XCTAssertEqual(dark[40], 40)
-        DarkMode.applySwitchTable(&dark, table)
-        XCTAssertEqual(dark, osos)
+        XCTAssertEqual(Array(dark[0..<4]), Array(osos[0..<4])); XCTAssertEqual(Array(dark[7..<20]), Array(osos[7..<20]))
+    }
+
+    /// The same bytes as the Python version (tests/test_darkmode.py has the same value).
+    func testLZ4KnownBytes() throws {
+        let sample = [UInt8](String(repeating: "Dark Mode ", count: 8).utf8) + (0..<40).map { UInt8($0) }
+            + [UInt8](String(repeating: "Dark Mode ", count: 5).utf8)
+        let hex = DarkMode.lz4Compress(sample).map { String(format: "%02x", $0) }.joined()
+        XCTAssertEqual(hex, "af4461726b204d6f6465200a0033ff19000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20212223242526276e001a504d6f646520")
+        XCTAssertEqual(try DarkMode.lz4Decompress(DarkMode.lz4Compress(sample), length: sample.count), sample)
+        XCTAssertThrowsError(try DarkMode.lz4Decompress([0x10], length: 1))
+        XCTAssertThrowsError(try DarkMode.lz4Decompress(DarkMode.lz4Compress(sample), length: sample.count + 1))
+    }
+
+    func testLZ4RoundTrip() throws {
+        var seed: UInt64 = 1
+        func rnd() -> UInt8 { seed = seed &* 6364136223846793005 &+ 1442695040888963407; return UInt8(truncatingIfNeeded: seed >> 33) }
+        for n in [0, 1, 4, 5, 12, 13, 17, 40, 300, 5000, 70000] {
+            let random = (0..<n).map { _ in rnd() }
+            let repeated = (0..<n).map { UInt8(97 + $0 % 3) }
+            let few = (0..<n).map { _ in [UInt8(97), 98, 0][Int(rnd()) % 3] }
+            for data in [random, repeated, few, [UInt8](repeating: 0, count: n)] {
+                XCTAssertEqual(try DarkMode.lz4Decompress(DarkMode.lz4Compress(data), length: data.count), data)
+            }
+        }
     }
 
     func testThemeKeepsTheBlueHighlight() throws {

@@ -689,9 +689,8 @@ final class AppModel: ObservableObject {
         return out.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
 
-    /// The theme that the app selects if the owner selected none. Dark Gray is small enough for
-    /// "Switch on iPod". Classic Dark is not (refer to re/classic-dark.md).
-    static let defaultThemeName = "Dark Gray"
+    /// The theme that the app selects if the owner selected none.
+    static let defaultThemeName = "Classic Dark"
 
     var selectedTheme: ThemeFile? {
         themes.first { $0.name == selectedThemeName } ?? themes.first { $0.name == Self.defaultThemeName } ?? themes.first

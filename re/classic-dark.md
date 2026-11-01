@@ -35,9 +35,16 @@ Not tested on a real iPod: the theme in this app. The builder itself ran on a re
 
 ## Size with "Switch on iPod"
 
-The switch table holds the data of all changes. Classic Dark has 783,663 bytes of new data after the background is stored as a 4-bit grey picture. Dark Gray has 699,106 bytes. With no other patch, the code of `dark-mode` ends 29,425 bytes after the limit 0x7F8000. The patches of the owner need approximately 53,000 bytes more. Thus Classic Dark works only with the appearance Dark.
+Version 1.1 of the `dark-mode` patch stored the data of all changes in the switch table (old XOR new). Classic Dark has 783,663 bytes of new data after the background is stored as a 4-bit grey picture. With no other patch, the code of the patch ended 29,425 bytes after the limit 0x7F8000.
 
-To use Classic Dark with "Switch on iPod", compress the table. Refer to [dark-mode-compression.md](dark-mode-compression.md). That change needs a decoder in `dark_mode.c`, and a test on a real iPod.
+Version 2.0 stores the new bytes with LZ4 and decodes them at the start. Refer to [dark-mode-compression.md](dark-mode-compression.md) and [../docs/modifications.md](../docs/modifications.md#dark-mode-switch). Measured on 2 November 2026:
+
+| Theme | Switch table | "Switch on iPod" adds | Free below 0x7F8000 |
+|---|---|---|---|
+| Classic Dark | 275,992 bytes | 317,440 bytes | 475,136 bytes |
+| Dark Gray | 268,867 bytes | 311,296 bytes | – |
+
+The decoder was run on the real image of Classic Dark, with the host compiler and the address sanitizer. The result is the same as the theme applied to the Apple firmware, outside the hooks and the menu entry. Not tested: the decoder on a real iPod or in the emulator.
 
 ## Not in the theme
 
