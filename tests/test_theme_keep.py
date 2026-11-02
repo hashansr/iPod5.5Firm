@@ -38,5 +38,5 @@ def test_builtin_classic_dark():
     assert t.keep_apple == []
     assert any(c.resource == "BMap 24342" for c in t.changes)
     assert any(c.resource.endswith("(table entry)") for c in t.changes)
-    assert len([c for c in t.changes if c.resource.endswith(themeimport.GREY_CONTROLS)]) == 21
+    assert len([c for c in t.changes if c.resource.endswith(themeimport.GREY_CONTROLS)]) == 36
     assert Theme.from_json((REPO / "themes/Dark Gray.ipodtheme").read_text()).keep_apple is None

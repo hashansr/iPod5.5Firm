@@ -58,6 +58,9 @@ KEEP_APPLE = {"BMap 24342": "Apple's progress bar stays (the theme makes it almo
 APPLE_HIGHLIGHT = (0xFFD06428, 0xFFE89858)
 # The label of a change that sets the colours of a Cntl element. The highlight rule leaves it as it is.
 GREY_CONTROLS = " (grey controls)"
+# The element types that count as controls: a control, a gradient rectangle and a status strip.
+# A list row (None, BMap, Str) keeps Apple's blue.
+GREY_TAGS = ("Cntl", "Draw", "StSt")
 
 
 class ThemeError(Exception):
@@ -447,8 +450,8 @@ def _moved_table_entry(t: "_Image", b: "_Image", n: "_Image", key, nkey) -> Chan
 def grey_controls(target_fw: FirmwarePartition, source: Theme, existing: list[Change]) -> list[Change]:
     """The changes that give the Cntl elements of the target firmware the colours of `source`.
 
-    A Cntl element is a control (for example a scrollbar). Its two highlight colours are at +76 and
-    +80. The theme "Dark Gray" makes them grey. Classic Dark keeps Apple's blue for the lists, and
+    A Cntl, Draw or StSt element is a control (for example a scrollbar). Its two highlight colours are
+    at +76 and +80. The theme "Dark Gray" makes them grey. Classic Dark keeps Apple's blue for the lists, and
     uses these changes to make the controls grey. An element that another change of `existing`
     touches gets no change."""
     n = _Image(target_fw)
@@ -465,7 +468,7 @@ def grey_controls(target_fw: FirmwarePartition, source: Theme, existing: list[Ch
         for p, _size, tag, _id in elements or []:
             at = start + p + 76
             old, new = n.osos[at:at + 8], bytes(source_osos[at:at + 8])
-            if tag != "Cntl" or old == new or any(a < at + 8 and at < b for a, b in taken):
+            if tag not in GREY_TAGS or old == new or any(a < at + 8 and at < b for a, b in taken):
                 continue
             out.append(Change(f"{_label(key)}{GREY_CONTROLS}", at, bytes(old), new))
     return out

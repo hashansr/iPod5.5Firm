@@ -16,7 +16,7 @@ ipodfw import-theme dark.fw iPod_25.1.3.ipsw iPod_25.1.3.ipsw --own-progress-bar
 ipodfw strip-theme classic-dark.json -o "themes/Classic Dark.ipodtheme"
 ```
 
-3. The result has 4597 changes in format 2. It holds no byte of the Apple firmware.
+3. The result has 4612 changes in format 2. It holds no byte of the Apple firmware.
 
 ## What the import adds
 
@@ -29,9 +29,10 @@ The import of an iPodWizard theme skips three items of this theme. Two options o
 
 ## Grey controls
 
-The owner prefers the scrollbar of Dark Gray. In Dark Gray the second highlight colour (+80) of the `Cntl` elements is grey (`ff343434`). In Classic Dark it is Apple's blue. Option `--grey-controls "themes/Dark Gray.ipodtheme"` of `import-theme` adds one change for each `Cntl` element, with the label "View N (grey controls)". The change gives the element the colours of Dark Gray. The highlight rule skips changes with this label (`GREY_CONTROLS`, `ThemeImport.greyControls`).
+The owner prefers the scrollbar of Dark Gray. In Dark Gray the second highlight colour (+80) of many elements is grey (`ff343434`). In Classic Dark it is Apple's blue. Option `--grey-controls "themes/Dark Gray.ipodtheme"` of `import-theme` adds one change for each control element, with the label "View N (grey controls)". The change gives the element the colours of Dark Gray. The highlight rule skips changes with this label (`GREY_CONTROLS`, `ThemeImport.greyControls`). List rows (None, BMap and Str elements) keep Apple's blue.
 
-Result of 2 November 2026: 21 changes, 23 `Cntl` elements equal to Dark Gray, and no other highlight word is different from Apple's blue. Not known: if the `Cntl` elements are the scrollbar. The list of the elements is a test. Not tested on a real iPod.
+- 2 November 2026, first try: only the 21 `Cntl` elements. The owner flashed it and sent a photo of the Music list. The scrollbar at the right edge was still blue. Thus the `Cntl` elements are not the scrollbar.
+- Second try: the `Cntl`, `Draw` and `StSt` elements. This gives 36 changes in 34 views. The scrollbar is not a picture: no tall narrow picture is blue in Classic Dark and grey in Dark Gray. Not tested on a real iPod.
 
 ## Check
 

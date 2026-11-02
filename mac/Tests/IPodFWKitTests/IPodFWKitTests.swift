@@ -2930,7 +2930,7 @@ final class ThemeKeepAppleTests: XCTestCase {
         XCTAssertEqual(classic.keep_apple, [])
         XCTAssertTrue(classic.changes.contains { $0.resource == "BMap 24342" })
         XCTAssertTrue(classic.changes.contains { $0.resource.hasSuffix("(table entry)") })
-        XCTAssertEqual(classic.changes.filter { $0.resource.hasSuffix(ThemeImport.greyControls) }.count, 21)
+        XCTAssertEqual(classic.changes.filter { $0.resource.hasSuffix(ThemeImport.greyControls) }.count, 36)
         let gray = try ImportedTheme.load(dir.appendingPathComponent("Dark Gray.ipodtheme"))
         XCTAssertNil(gray.keep_apple)
     }
