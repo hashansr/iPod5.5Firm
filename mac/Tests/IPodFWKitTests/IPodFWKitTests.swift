@@ -2975,3 +2975,30 @@ final class SettingsMigrationTests: XCTestCase {
         XCTAssertTrue(d.bool(forKey: SettingsMigration.doneKey))
     }
 }
+
+/// A built-in theme that changed in a later app replaces the copy of the owner.
+final class ThemeUpdateTests: XCTestCase {
+    private func theme(_ n: UInt8, edits: [ThemeChange] = []) -> ImportedTheme {
+        var t = ImportedTheme(name: "t", source_sha256: "", osos_sha256: "x")
+        t.changes = [ThemeChange(resource: "BMap 1", offset: 10, old: Data([1]), new: Data([n]), oldSHA256: nil)]
+        t.edits = edits
+        return t
+    }
+
+    func testSameThemeGivesNoUpdate() {
+        XCTAssertNil(ImportedTheme.updatedCopy(bundled: theme(2), installed: theme(2)))
+    }
+
+    func testChangedThemeReplacesTheCopyAndKeepsTheEdits() throws {
+        let edit = ThemeChange(resource: "BMap 5", offset: 99, old: Data([1]), new: Data([7]), oldSHA256: nil)
+        let updated = try XCTUnwrap(ImportedTheme.updatedCopy(bundled: theme(3), installed: theme(2, edits: [edit])))
+        XCTAssertEqual(updated.changes, theme(3).changes)
+        XCTAssertEqual(updated.edits, [edit])
+    }
+
+    func testChangedKeepAppleListGivesAnUpdate() {
+        var bundled = theme(2)
+        bundled.keep_apple = []
+        XCTAssertNotNil(ImportedTheme.updatedCopy(bundled: bundled, installed: theme(2)))
+    }
+}

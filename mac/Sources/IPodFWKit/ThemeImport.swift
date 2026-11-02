@@ -320,6 +320,20 @@ public struct ImportedTheme: Codable, Equatable, Identifiable {
     }
 }
 
+public extension ImportedTheme {
+    /// The theme of the owner after an update of a built-in theme. The app copies a built-in theme into
+    /// the folder of the owner at the first start. A later app has a changed built-in theme. This function
+    /// gives the changed theme with the pictures that the owner replaced (`edits`), or nil if the copy
+    /// is already the changed theme.
+    static func updatedCopy(bundled: ImportedTheme, installed: ImportedTheme) -> ImportedTheme? {
+        guard bundled.changes != installed.changes || bundled.keep_apple != installed.keep_apple
+                || bundled.osos_sha256 != installed.osos_sha256 else { return nil }
+        var out = bundled
+        out.edits = installed.edits
+        return out
+    }
+}
+
 public enum ThemeImport {
     public static let format = 1
     /// Format 2 stores, for each change, the SHA-256 of the old bytes in place of

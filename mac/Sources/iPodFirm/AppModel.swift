@@ -683,7 +683,13 @@ final class AppModel: ObservableObject {
                     out.append(ThemeFile(name: copied.name, url: dest, theme: copied))
                 }
             } else if let copied = try? ImportedTheme.load(dest) {
-                out.append(ThemeFile(name: copied.name, url: dest, theme: copied))
+                // The copy comes from an earlier app. A built-in theme that changed replaces it. The
+                // pictures that the owner replaced stay.
+                if let updated = ImportedTheme.updatedCopy(bundled: theme, installed: copied), (try? updated.write(to: dest)) != nil {
+                    out.append(ThemeFile(name: updated.name, url: dest, theme: updated))
+                } else {
+                    out.append(ThemeFile(name: copied.name, url: dest, theme: copied))
+                }
             }
         }
         return out.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
