@@ -35,7 +35,9 @@ The owner prefers the scrollbar of Dark Gray. In Classic Dark the thumb is blue.
 - Picture 24351 (11 × 11) is the thumb. In the owner's Classic Dark photo the thumb has the colour (41, 101, 206), the flat blue of this picture. Dark Gray has (33, 36, 33). The track (picture 24350) is black in both themes.
 - Option `--borrow "themes/Dark Gray.ipodtheme" --borrow-ids 24351` of `import-theme` replaces the changes for picture 24351 with those of Dark Gray.
 
-Check: the only resources that differ from the image of the dark builder are picture 21997 (the background, stored smaller) and picture 24351 (the thumb). Not tested on a real iPod.
+Check: the only resources that differ from the image of the dark builder are picture 21997 (the background, stored smaller) and picture 24351 (the thumb).
+
+Real iPod 5.5G (owner, 3 November 2026): the thumb is grey. The owner confirms that the problem is solved.
 
 ## Check
 
@@ -54,7 +56,7 @@ Version 2.0 stores the new bytes with LZ4 and decodes them at the start. Refer t
 | Classic Dark | 275,992 bytes | 317,440 bytes | 475,136 bytes |
 | Dark Gray | 268,867 bytes | 311,296 bytes | – |
 
-The decoder was run on the real image of Classic Dark, with the host compiler and the address sanitizer. The result is the same as the theme applied to the Apple firmware, outside the hooks and the menu entry. Not tested: the decoder on a real iPod or in the emulator.
+The decoder was run on the real image of Classic Dark, with the host compiler and the address sanitizer. The result is the same as the theme applied to the Apple firmware, outside the hooks and the menu entry. Not tested: the decoder on a real iPod with "Switch on iPod", or in the emulator.
 
 ## Not in the theme
 
