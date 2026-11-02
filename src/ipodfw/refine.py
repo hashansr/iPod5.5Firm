@@ -14,7 +14,9 @@ file in `themes/`. Run it with `ipodfw refine-theme`. A second run on the result
    that the dial does not look like a white disc on the black screen.
 5. The button 22206 (Start, and the blue button of other screens). The builder gave it yellow and white
    pixels at the corners and the bottom. The picture is new: a flat body and a ring.
-6. Backgrounds. Four screens (the Stopwatch, the Screen Lock and its set-up screens) draw a light
+6. The "New Clock" icon (24407 and 24408). Apple's icon is a coarse ring of dots in RGB565. The new
+   icon is drawn with smooth edges (ARGB4444): 12 dashes in a ring and the hands at 10:10.
+7. Backgrounds. Four screens (the Stopwatch, the Screen Lock and its set-up screens) draw a light
    metal texture in code (Draw 24553). The background picture 21997 takes its place, and the dark
    style of text (Type 22199) gets white text.
 """
@@ -40,6 +42,9 @@ CELL_PICTURES = (24393, 24394)
 DIAL_PICTURES = tuple(range(24395, 24400))
 DIAL_KNOB, DIAL_BEZEL, DIAL_DARKEN = 30.0, 53.5, 0.38      # the radii (in pixels) of the metal parts
 BUTTON_PICTURE, BUTTON_BODY = 22206, (33, 97, 206)
+CLOCK_ICONS = (24407, 24408)
+ARGB4444 = 0x1444
+SUPER = 8                       # the samples for each pixel side, for the smooth edges
 RING = (24, 60, 148)          # a dark blue of Apple's hue: the accent changes it
 WHITE = (255, 255, 255)       # the transparent colour of an RGB565 picture
 
@@ -95,6 +100,40 @@ def _new_button(osos: bytearray, stock: bytes, pic: pictures.Picture) -> None:
             else:
                 value = BUTTON_BODY
             pictures._set(osos, pic.data_pos + y * pic.bytes_per_row, x, pic, value)
+
+
+def _inside_clock_icon(x: float, y: float) -> bool:
+    """True if the point (in pixels, the picture is 45 x 45) is in the icon: the ring of 12 dashes, the hands
+    at 10:10 and the centre dot."""
+    import math
+    dx, dy = x - 22.5, y - 22.5
+    r = math.hypot(dx, dy)
+    if 17.5 <= r <= 20.7:
+        angle = (math.degrees(math.atan2(dx, -dy)) + 360) % 360       # 0 at 12 o'clock, clockwise
+        off = (angle + 15) % 30 - 15
+        if abs(off) <= 6.0:
+            return True
+    if r <= 2.3:
+        return True
+    for degrees, length in ((-60.0, 10.5), (60.0, 14.5)):             # the hour and the minute hand
+        a = math.radians(degrees)
+        ux, uy = math.sin(a), -math.cos(a)
+        t = max(0.0, min(length, dx * ux + dy * uy))
+        if math.hypot(dx - t * ux, dy - t * uy) <= 1.6:
+            return True
+    return False
+
+
+def _new_clock_icon(osos: bytearray, pic: pictures.Picture) -> None:
+    """Draw the icon in ARGB4444: white, with the alpha of the smooth edge."""
+    struct.pack_into("<H", osos, pic.pos, ARGB4444)
+    pic = pictures.parse(bytes(osos), pic.pos)
+    for y in range(pic.height):
+        for x in range(pic.width):
+            hits = sum(_inside_clock_icon(x + (i + 0.5) / SUPER, y + (j + 0.5) / SUPER)
+                       for i in range(SUPER) for j in range(SUPER))
+            alpha = round(15 * hits / (SUPER * SUPER)) * 17
+            pictures._set(osos, pic.data_pos + y * pic.bytes_per_row, x, pic, (255, 255, 255, alpha))
 
 
 def _flatten_bottom_line(osos: bytearray, pic: pictures.Picture) -> None:
@@ -162,6 +201,13 @@ def refine_theme(theme: Theme, fw: FirmwarePartition, original_sha256: str) -> T
             raise ThemeError(f"The firmware has no picture {rid}.")
         extents[f"BMap {rid}"] = (block.abs(r), block.abs(r) + r.size)
         _darken_dial(final, stock, pic)
+    for rid in CLOCK_ICONS:
+        r = pics.get(rid)
+        pic = pictures.parse(bytes(final), block.abs(r)) if r else None
+        if pic is None:
+            raise ThemeError(f"The firmware has no picture {rid}.")
+        extents[f"BMap {rid}"] = (block.abs(r), block.abs(r) + r.size)
+        _new_clock_icon(final, pic)
     r = pics.get(BUTTON_PICTURE)
     pic = pictures.parse(bytes(final), block.abs(r)) if r else None
     if pic is None:

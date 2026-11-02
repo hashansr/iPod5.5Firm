@@ -3042,8 +3042,8 @@ final class AccentTests: XCTestCase {
     static let grid = ["#ff3b30": "b9e9a7323dbba6053ddfd623d6d5ab143f325460b3bc39386e93d75816131921",
                        "#30d158": "279e551d6704051a7ebe7da93b90ccf419183cbb7e48f4f061b4996ceaeecbc6",
                        "#bf5af2": "e5e8ff4b5cc2b1d2dd1047c883010b2b137e3688c1f8032d08e5f09775e238d2"]
-    static let osos = ["#ff3b30": "45cfc7d67016ad88083ae169f2bf0adec4f5c3b62eb9d4bec25746c36bded45a",
-                       "#bf5af2": "0851ccc25fae5d73cf47b0c1df72e24cba0c1829fd91f706b60f5b9b4476eade"]
+    static let osos = ["#ff3b30": "c289f447b1368471620a258fb3316623b6f3ac7190e9ca7b7d439dbc813dbe6c",
+                       "#bf5af2": "d019d4a6eeaa2ebf96b062d62a1870634c8ac1d868eabd4296f27f054620ecab"]
 
     func testTheColourMustHaveTheFormRRGGBB() throws {
         for bad in ["", "red", "#12345", "#12345g", "1234567"] {

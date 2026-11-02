@@ -26,7 +26,7 @@ def _load():
 def test_the_clock_pictures_are_apples_art():
     _, stock, _, block, out = _load()
     for r in block.of_type("BMap"):
-        if r.id in refine.KEEP_APPLE_PICTURES:
+        if r.id in refine.KEEP_APPLE_PICTURES and r.id not in refine.CLOCK_ICONS:
             assert out[block.abs(r):block.abs(r) + r.size] == stock[block.abs(r):block.abs(r) + r.size], r.id
 
 
@@ -92,6 +92,18 @@ def test_the_button_22206_has_no_light_pixel():
             assert (px == refine.WHITE) == (was == refine.WHITE)       # the same transparent pixels
             colours.add(px)
     assert colours == {refine.WHITE, refine.RING, refine.BUTTON_BODY}
+
+
+def test_the_new_clock_icon_is_smooth_argb4444():
+    _, _, _, block, out = _load()
+    for r in block.of_type("BMap"):
+        if r.id not in refine.CLOCK_ICONS:
+            continue
+        pic = pictures.parse(out, block.abs(r))
+        assert pic.texture_format == refine.ARGB4444 and (pic.width, pic.height) == (45, 45)
+        alphas = {pictures._get(out, pic.data_pos + y * pic.bytes_per_row, x, pic)[3] for y in range(45) for x in range(45)}
+        assert 0 in alphas and 255 in alphas and len(alphas) > 4          # empty, full and the steps of the edge
+        assert pictures._get(out, pic.data_pos, 0, pic)[3] == 0           # the corner is empty
 
 
 def test_a_second_run_changes_nothing():
