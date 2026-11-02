@@ -5,7 +5,8 @@ that blue to the colour of the owner. The Swift version is `Accent.swift`. The t
 the same steps and the same rounding, so that the tests can compare them.
 
 - The selection bar of the Views is a gradient of two colours (APPLE_BOTTOM and APPLE_TOP). The
-  gradient gets the new colour at the top and 0.8 times the new colour at the bottom.
+  gradient gets the new colour at the top and 0.8 times the new colour at the bottom. No channel of
+  the top colour is larger than 232, as in Apple's blue.
 - The pictures in ACCENT_PICTURES hold Apple's blue (the rating star, a button of the Stopwatch,
   the selected cell of the Screen Lock, the ring of the balls of Brick and so on). Each saturated pixel gets the hue, the saturation and the brightness of the new colour in
   proportion to Apple's blue.
@@ -33,6 +34,9 @@ ACCENT_PICTURES = (13981, 13982, 24279, 24403, 24404, 24405, 24406, 24407, 24408
                    22206, 24394)
 
 SAT_MIN, VAL_MIN = 0.35, 0.15
+# The largest channel of the top colour of the selection bar. Apple's blue has 232 (0xe8). The owner saw
+# yellow pixels at the top of a red bar (255, 69, 58): the code that draws the bar needs room above the colour.
+MAX_CHANNEL = 232
 
 
 class AccentError(ThemeError):
@@ -55,6 +59,9 @@ def accent_words(text: str) -> tuple[bytes, bytes]:
     r, g, b = parse_hex(text)
     if (r, g, b) == parse_hex(APPLE_ACCENT):
         return APPLE_BOTTOM, APPLE_TOP
+    top = max(r, g, b)
+    if top > MAX_CHANNEL:              # the drawing code needs room above the top colour (see MAX_CHANNEL)
+        r, g, b = (int(c * MAX_CHANNEL / top + 0.5) for c in (r, g, b))
     return bytes([int(r * 0.8), int(g * 0.8), int(b * 0.8), 255]), bytes([r, g, b, 255])
 
 

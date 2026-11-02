@@ -3042,8 +3042,8 @@ final class AccentTests: XCTestCase {
     static let grid = ["#ff3b30": "b9e9a7323dbba6053ddfd623d6d5ab143f325460b3bc39386e93d75816131921",
                        "#30d158": "279e551d6704051a7ebe7da93b90ccf419183cbb7e48f4f061b4996ceaeecbc6",
                        "#bf5af2": "e5e8ff4b5cc2b1d2dd1047c883010b2b137e3688c1f8032d08e5f09775e238d2"]
-    static let osos = ["#ff3b30": "34df4489c0e7b2e34978d2d13d473ca35400df1e4d88d72b37759f64ce274c88",
-                       "#bf5af2": "76aaf83b288d51a891181a81e6fec6218771e26015f99fe9dfecb5afa2b5e856"]
+    static let osos = ["#ff3b30": "45cfc7d67016ad88083ae169f2bf0adec4f5c3b62eb9d4bec25746c36bded45a",
+                       "#bf5af2": "0851ccc25fae5d73cf47b0c1df72e24cba0c1829fd91f706b60f5b9b4476eade"]
 
     func testTheColourMustHaveTheFormRRGGBB() throws {
         for bad in ["", "red", "#12345", "#12345g", "1234567"] {
@@ -3065,8 +3065,9 @@ final class AccentTests: XCTestCase {
 
     func testTheGradientHasTheColourAtTheTop() throws {
         let w = try Accent.words("#ff3b30")
-        XCTAssertEqual(w.top, [255, 59, 48, 255])
-        XCTAssertEqual(w.bottom, [204, 47, 38, 255])
+        XCTAssertEqual(w.top, [232, 54, 44, 255])          // the largest channel is 232
+        XCTAssertEqual(w.bottom, [185, 43, 35, 255])
+        XCTAssertEqual(try Accent.words("#30d158").top, [48, 209, 88, 255])   // a colour below the limit stays
     }
 
     func testTintKeepsGreyAndMovesBlue() throws {

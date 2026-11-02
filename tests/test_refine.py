@@ -64,6 +64,36 @@ def test_the_cells_of_the_screen_lock_have_no_white_line():
             assert out[last:last + n] == out[last - n:last]
 
 
+def test_the_dial_of_the_screen_lock_is_dark_outside_the_face():
+    _, _, _, block, out = _load()
+    for r in block.of_type("BMap"):
+        if r.id not in refine.DIAL_PICTURES:
+            continue
+        pic = pictures.parse(out, block.abs(r))
+        cx, cy = (pic.width - 1) / 2, (pic.height - 1) / 2
+        for y in range(pic.height):
+            for x in range(pic.width):
+                d = ((x - cx) ** 2 + (y - cy) ** 2) ** 0.5
+                px = pictures._get(out, pic.data_pos + y * pic.bytes_per_row, x, pic)
+                if (d <= refine.DIAL_KNOB or d >= refine.DIAL_BEZEL) and px != refine.WHITE:
+                    assert max(px) <= 110, (r.id, x, y, px)
+
+
+def test_the_button_22206_has_no_light_pixel():
+    _, stock, _, block, out = _load()
+    r = [r for r in block.of_type("BMap") if r.id == refine.BUTTON_PICTURE][0]
+    pic = pictures.parse(out, block.abs(r))
+    old = pictures.parse(stock, block.abs(r))
+    colours = set()
+    for y in range(pic.height):
+        for x in range(pic.width):
+            px = pictures._get(out, pic.data_pos + y * pic.bytes_per_row, x, pic)
+            was = pictures._get(stock, old.data_pos + y * old.bytes_per_row, x, old)
+            assert (px == refine.WHITE) == (was == refine.WHITE)       # the same transparent pixels
+            colours.add(px)
+    assert colours == {refine.WHITE, refine.RING, refine.BUTTON_BODY}
+
+
 def test_a_second_run_changes_nothing():
     fw, _, theme, _, _ = _load()
     again = refine.refine_theme(theme, fw, theme.osos_sha256)

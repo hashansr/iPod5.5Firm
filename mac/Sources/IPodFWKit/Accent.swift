@@ -16,6 +16,9 @@ public enum Accent {
                                      24361, 24362, 24363, 24364, 24365, 24366,
                                      22206, 24394]
     static let satMin = 0.35, valMin = 0.15
+    /// The largest channel of the top colour of the selection bar. Apple's blue has 232 (0xe8). The owner saw
+    /// yellow pixels at the top of a red bar (255, 69, 58): the code that draws the bar needs room above the colour.
+    static let maxChannel = 232
 
     /// Colours that the owner can select quickly. The first is Apple's blue.
     public static let presets: [(name: String, hex: String)] = [
@@ -41,7 +44,10 @@ public enum Accent {
     static func words(_ text: String) throws -> (bottom: [UInt8], top: [UInt8]) {
         let (r, g, b) = try parseHex(text)
         if isApple(text) { return (appleBottom, appleTop) }
-        return ([UInt8(Double(r) * 0.8), UInt8(Double(g) * 0.8), UInt8(Double(b) * 0.8), 255], [UInt8(r), UInt8(g), UInt8(b), 255])
+        var c = [r, g, b]
+        let top = c.max()!
+        if top > maxChannel { c = c.map { Int(Double($0) * Double(maxChannel) / Double(top) + 0.5) } }
+        return (c.map { UInt8(Double($0) * 0.8) } + [255], c.map { UInt8($0) } + [255])
     }
 
     static func mod(_ x: Double, _ m: Double) -> Double {

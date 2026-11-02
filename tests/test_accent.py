@@ -18,8 +18,8 @@ GRID = {
 }
 # The hash of osos with Classic Dark and the accent. The Swift test (testClassicDarkWithAccent) has the same values.
 OSOS = {
-    "#ff3b30": "34df4489c0e7b2e34978d2d13d473ca35400df1e4d88d72b37759f64ce274c88",
-    "#bf5af2": "76aaf83b288d51a891181a81e6fec6218771e26015f99fe9dfecb5afa2b5e856",
+    "#ff3b30": "45cfc7d67016ad88083ae169f2bf0adec4f5c3b62eb9d4bec25746c36bded45a",
+    "#bf5af2": "0851ccc25fae5d73cf47b0c1df72e24cba0c1829fd91f706b60f5b9b4476eade",
 }
 
 
@@ -39,7 +39,8 @@ def test_the_accent_of_apple_changes_nothing():
 
 def test_the_gradient_has_the_colour_at_the_top_and_a_darker_colour_at_the_bottom():
     bottom, top = accent.accent_words("#ff3b30")
-    assert top == bytes([255, 59, 48, 255]) and bottom == bytes([204, 47, 38, 255])
+    assert top == bytes([232, 54, 44, 255]) and bottom == bytes([185, 43, 35, 255])   # the largest channel is 232
+    assert accent.accent_words("#30d158")[1] == bytes([48, 209, 88, 255])             # a colour below the limit stays
 
 
 def test_the_tint_keeps_grey_and_dark_pixels_and_moves_blue():
