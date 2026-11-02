@@ -93,6 +93,6 @@ Version 2.0 of the `dark-mode` patch uses compression. The method is LZ4 on the 
 
 ## Open items
 
-- Measure the time to decode on the iPod or in the emulator. On a Mac with the address sanitizer, the decoder takes 0.39 s for the table of Classic Dark.
+- Measure the time to decode on the iPod or in the emulator. On a Mac with the address sanitizer, the decoder takes 0.39 s for the table of Classic Dark. The decoder operates on the real iPod (owner, 3 November 2026), but nobody measured the time there.
 - The decoder code is 1.2 KB larger than version 1.1 (patch size 2141 bytes).
 - Test on a real iPod. If a decoder bug writes wrong bytes, set the iPod to disk mode and delete `iPod_Control/iTunes/iPodFirmDarkMode`. The patch also examines the table before it writes.

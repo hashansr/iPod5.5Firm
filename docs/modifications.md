@@ -26,7 +26,7 @@ All addresses are osos offsets for Apple firmware 1.3. Refer to [The address rul
 | [custom-eq](#custom-eq) | Code patch (extended) | Patches | 1 `bl`, 1 `b`, 2 words (`bytes`) | Version 0.1: yes, a basic test by the owner. Version 0.2 and later: no |
 | [usb-audio-out](#usb-audio-out) | Code patch | Patches | 17 `bl`, 2 `b` and 4 words (3 with `chain`), a Settings menu | Yes (2026-10-17) |
 | [Dark theme](#dark-theme) | Resource data | Patches > iPod Appearance | BMap, View and Type bytes | Yes |
-| [Dark Mode switch](#dark-mode-switch) | Code and data | Patches > iPod Appearance | 1 `b` and 2 vtable words, a compressed table and a menu | Version 1.1: yes (28 October 2026). Version 2.0: not tested on a real iPod |
+| [Dark Mode switch](#dark-mode-switch) | Code and data | Patches > iPod Appearance | 1 `b` and 2 vtable words, a compressed table and a menu | Version 1.1: yes (28 October 2026). Version 2.0: yes (3 November 2026) |
 | [Move of rsrc](#move-of-rsrc) | Partition layout | Automatic | 1 directory entry | Yes |
 
 ## The build sequence
