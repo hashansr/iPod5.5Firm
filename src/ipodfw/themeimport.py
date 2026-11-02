@@ -96,7 +96,7 @@ class Theme:
             out = {"resource": c.resource, "offset": c.offset, "new": base64.b64encode(c.new).decode()}
             if c.copy:
                 out["copy"] = c.copy
-            if stripped and c.old:
+            if stripped and (c.old or c.old_sha256):
                 out["old_sha256"] = c.old_sha256 or _sha256(c.old)
             elif stripped:
                 out["old_sha256"] = ""            # the change has no old bytes (data after the end of osos)

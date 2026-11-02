@@ -54,3 +54,16 @@ def test_builtin_classic_dark():
     thumb = lambda th: [(c.offset, c.new) for c in th.changes if c.resource == "BMap 24351"]
     assert thumb(t) and thumb(t) == thumb(gray)
     assert Theme.from_json((REPO / "themes/Dark Gray.ipodtheme").read_text()).keep_apple is None
+
+
+def test_a_stripped_theme_keeps_the_hash_of_a_change_that_has_no_old_bytes():
+    other = Theme("other", "", "x", [Change("BMap 24351", 1, b"a", b"b")])
+    stripped = Theme.from_json(other.to_json(stripped=True))
+    assert stripped.changes[0].old == b"" and stripped.changes[0].old_sha256
+    again = Theme.from_json(stripped.to_json(stripped=True))
+    assert again.changes[0].old_sha256 == stripped.changes[0].old_sha256
+
+
+def test_the_built_in_classic_dark_checks_the_old_bytes_of_every_change_in_osos():
+    t = Theme.from_json((REPO / "themes/Classic Dark.ipodtheme").read_text())
+    assert [c.resource for c in t.changes if not c.old_sha256 and c.resource == "BMap 24351"] == []
