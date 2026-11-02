@@ -157,6 +157,14 @@ final class AppModel: ObservableObject {
     @Published var selectedThemeName: String? = UserDefaults.standard.string(forKey: "darkTheme") {
         didSet { UserDefaults.standard.set(selectedThemeName, forKey: "darkTheme"); switchesChanged(oldValue != selectedThemeName) }
     }
+    /// The accent colour of the dark theme (#rrggbb). The blue of Apple (`Accent.apple`) changes nothing.
+    @Published var accent: String = AppModel.storedAccent() {
+        didSet { UserDefaults.standard.set(accent, forKey: "accent"); switchesChanged(oldValue != accent) }
+    }
+    private static func storedAccent() -> String {
+        let s = UserDefaults.standard.string(forKey: "accent") ?? ""
+        return (try? Accent.parseHex(s)) == nil ? Accent.apple : s.lowercased()
+    }
     @Published var customVersionOn = UserDefaults.standard.bool(forKey: "customVersionOn") {
         didSet { UserDefaults.standard.set(customVersionOn, forKey: "customVersionOn") }
     }
@@ -694,7 +702,8 @@ final class AppModel: ObservableObject {
         if appearance == .light {
             return layout == .split ? Self.splitTheme.map { .layout($0) } : nil
         }
-        guard let theme = selectedTheme?.theme else { return nil }
+        guard let file = selectedTheme else { return nil }
+        let theme = accentedTheme(file)
         switch appearance {
         case .light: return nil
         case .dark: return .dark(theme, layout: layout == .split ? Self.splitTheme : nil)
@@ -714,15 +723,35 @@ final class AppModel: ObservableObject {
 
     func isCompatible(_ t: ImportedTheme) -> Bool { editor?.originalOSOSHash == t.osos_sha256 }
 
+    private var accentCache: (key: String, theme: ImportedTheme)?
+
+    /// The theme with the accent colour of the owner. Without the open firmware, or with the blue of
+    /// Apple, it is the theme itself.
+    func accentedTheme(_ file: ThemeFile) -> ImportedTheme {
+        guard let editor, !Accent.isApple(accent), isCompatible(file.theme) else { return file.theme }
+        let key = "\(revision) \(themeRevision) \(file.name) \(accent)"
+        if let c = accentCache, c.key == key { return c.theme }
+        let theme: ImportedTheme
+        do {
+            theme = try file.theme.withAccent(accent, osos: editor.osos, originalSHA256: editor.originalOSOSHash,
+                                              appleLength: editor.partition.appleOSLength)
+        } catch {
+            AppLog.step("The accent colour \(accent) did not apply: \(error.localizedDescription)")
+            theme = file.theme
+        }
+        accentCache = (key, theme)
+        return theme
+    }
+
     private var switchSizeCache: (key: String, size: Int?)?
 
     /// The bytes that "Switch on iPod" adds to the firmware: the theme data, the switch table, the
     /// Settings menu and the dark-mode code. Nil if no theme agrees with the open firmware.
     var switchOnIPodSize: Int? {
         guard let editor, let file = selectedTheme, isCompatible(file.theme), let patch = Self.darkModePatch else { return nil }
-        let key = "\(revision) \(themeRevision) \(file.name) \(layout.rawValue)"
+        let key = "\(revision) \(themeRevision) \(file.name) \(layout.rawValue) \(accent)"
         if let c = switchSizeCache, c.key == key { return c.size }
-        let size = try? DarkMode.addedSize(partition: editor.partition, osos: editor.osos, theme: file.theme,
+        let size = try? DarkMode.addedSize(partition: editor.partition, osos: editor.osos, theme: accentedTheme(file),
                                            codeSize: patch.spec.size ?? 0,
                                            layout: layout == .split ? Self.splitTheme : nil)
         switchSizeCache = (key, size)

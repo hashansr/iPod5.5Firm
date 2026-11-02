@@ -2248,6 +2248,18 @@ final class FirmwareManifestTests: XCTestCase {
         XCTAssertNil(FirmwareManifest.read(osos: [UInt8](repeating: 0, count: Patcher.maxOSOSSize + 0x1000)))
     }
 
+    func testTheAccentSurvivesTheList() throws {
+        var list = Self.list
+        list.accent = "#ff3b30"
+        var osos = [UInt8](repeating: 0, count: Patcher.maxOSOSSize + 0x130)
+        osos += try list.encoded()
+        osos += [UInt8](repeating: 0, count: 0x800 - osos.count % 0x800)
+        XCTAssertEqual(FirmwareManifest.read(osos: osos)?.accent, "#ff3b30")
+        // A list from an earlier version has no accent.
+        XCTAssertNil(Self.list.accent)
+        XCTAssertFalse(String(decoding: try Self.list.encoded(), as: UTF8.self).contains("accent"))
+    }
+
     func testMirroredSwitches() {
         let d: [String: PatchDetection] = ["a": .installed(version: "1.0"), "b": .absent, "c": .unknown, "x": .installed(version: nil)]
         let out = PatchDetection.mirroredSwitches(current: ["b", "c"], detections: d, known: ["a", "b", "c"])
@@ -3022,5 +3034,83 @@ final class ThemeUpdateTests: XCTestCase {
         var bundled = theme(2)
         bundled.keep_apple = []
         XCTAssertNotNil(ImportedTheme.updatedCopy(bundled: bundled, installed: theme(2)))
+    }
+}
+
+/// The accent colour. The hashes are the same as in tests/test_accent.py (the Python reference).
+final class AccentTests: XCTestCase {
+    static let grid = ["#ff3b30": "b9e9a7323dbba6053ddfd623d6d5ab143f325460b3bc39386e93d75816131921",
+                       "#30d158": "279e551d6704051a7ebe7da93b90ccf419183cbb7e48f4f061b4996ceaeecbc6",
+                       "#bf5af2": "e5e8ff4b5cc2b1d2dd1047c883010b2b137e3688c1f8032d08e5f09775e238d2"]
+    static let osos = ["#ff3b30": "74b5ede17a2c32e0c7e1978d166a638cc395c86480bb399483540e146d61460c",
+                       "#bf5af2": "a9efbb0906bc167bfe6819fbfecdf2e3eb493797330c4a8025fb47203166178e"]
+
+    func testTheColourMustHaveTheFormRRGGBB() throws {
+        for bad in ["", "red", "#12345", "#12345g", "1234567"] {
+            XCTAssertThrowsError(try Accent.parseHex(bad), bad)
+        }
+        let c = try Accent.parseHex(" #FF3b30 ")
+        XCTAssertEqual([c.r, c.g, c.b], [255, 59, 48])
+    }
+
+    func testTheAccentOfAppleChangesNothing() throws {
+        XCTAssertTrue(Accent.isApple("#5898E8"))
+        XCTAssertFalse(Accent.isApple("#5898e9"))
+        let w = try Accent.words("#5898e8")
+        XCTAssertEqual(w.bottom, Accent.appleBottom)
+        XCTAssertEqual(w.top, Accent.appleTop)
+        let theme = ImportedTheme(name: "t", source_sha256: "", osos_sha256: "x")
+        XCTAssertEqual(try theme.withAccent("#5898e8", osos: [UInt8](repeating: 0, count: 16), originalSHA256: "x", appleLength: 16), theme)
+    }
+
+    func testTheGradientHasTheColourAtTheTop() throws {
+        let w = try Accent.words("#ff3b30")
+        XCTAssertEqual(w.top, [255, 59, 48, 255])
+        XCTAssertEqual(w.bottom, [204, 47, 38, 255])
+    }
+
+    func testTintKeepsGreyAndMovesBlue() throws {
+        let tint = try Accent.Tint("#ff3b30")
+        for grey in [(0, 0, 0), (128, 128, 128), (255, 255, 255), (10, 10, 20)] {
+            let p = tint.pixel(grey.0, grey.1, grey.2)
+            XCTAssertTrue(p == grey, "\(grey)")
+        }
+        let p = tint.pixel(0x58, 0x98, 0xE8)
+        XCTAssertTrue(p.0 > p.1 && p.0 > p.2)
+        let same = try Accent.Tint("#5898e8").pixel(0x58, 0x98, 0xE8)
+        XCTAssertTrue(same == (0x58, 0x98, 0xE8))
+    }
+
+    func testTintPixel() throws {
+        for (colour, hash) in Self.grid {
+            let tint = try Accent.Tint(colour)
+            var bytes: [UInt8] = []
+            for r in stride(from: 0, to: 256, by: 17) {
+                for g in stride(from: 0, to: 256, by: 17) {
+                    for b in stride(from: 0, to: 256, by: 17) {
+                        let p = tint.pixel(r, g, b)
+                        bytes += [UInt8(p.0), UInt8(p.1), UInt8(p.2)]
+                    }
+                }
+            }
+            XCTAssertEqual(ThemeImport.sha256(bytes), hash, colour)
+        }
+    }
+
+    func testClassicDarkWithAccent() throws {
+        guard let path = ProcessInfo.processInfo.environment["IPODFW_IPSW"] else { throw XCTSkip("set IPODFW_IPSW") }
+        let partition = try FirmwarePartition(data: IPSW.extractFirmware(URL(fileURLWithPath: path)).data)
+        let stock = try partition.image("osos")
+        let theme = try ImportedTheme.load(PatchAndArtTests.repo.appendingPathComponent("themes/Classic Dark.ipodtheme"))
+        for (colour, hash) in Self.osos {
+            let derived = try theme.withAccent(colour, osos: stock, originalSHA256: theme.osos_sha256, appleLength: partition.appleOSLength)
+            XCTAssertEqual(derived.keep_apple, [])
+            XCTAssertFalse(derived.keepsHighlight)
+            var out = stock
+            let r = try derived.apply(to: &out, originalSHA256: theme.osos_sha256)
+            XCTAssertEqual(r.conflicts, 0)
+            XCTAssertEqual(r.applied, derived.effectiveChanges.count)
+            XCTAssertEqual(ThemeImport.sha256(out), hash, colour)
+        }
     }
 }

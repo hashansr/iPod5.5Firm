@@ -36,7 +36,7 @@ struct SpaceUseRow: View {
     @EnvironmentObject var model: AppModel
 
     var key: String {
-        "\(model.enabledPatches.sorted())|\(model.appearance)|\(model.selectedThemeName ?? "")|\(model.editor.map { ObjectIdentifier($0).hashValue } ?? 0)|\(model.patches.count)"
+        "\(model.enabledPatches.sorted())|\(model.appearance)|\(model.selectedThemeName ?? "")|\(model.accent)|\(model.editor.map { ObjectIdentifier($0).hashValue } ?? 0)|\(model.patches.count)"
     }
 
     var body: some View {
@@ -796,6 +796,7 @@ struct AppearanceDetail: View {
                     Picker("Dark theme", selection: Binding(get: { current.name }, set: { model.selectedThemeName = $0 })) {
                         ForEach(model.themes) { Text($0.name).tag($0.name) }
                     }
+                    AccentControl(accent: $model.accent)
                     if model.editor != nil {
                         if model.isCompatible(current.theme) {
                             Label("Agrees with the open firmware (iPod Video 1.3).", systemImage: "checkmark.circle.fill")
@@ -960,5 +961,53 @@ struct ThemeReportSheet: View {
         var c: [String: Int] = [:]
         for l in labels { c[String(l.split(separator: " ").first ?? ""), default: 0] += 1 }
         return c.sorted { $0.key < $1.key }.map { "\($0.value) \($0.key)" }.joined(separator: ", ")
+    }
+}
+
+
+/// The accent colour of the dark theme: the colours of Apple's selection bar and of some pictures.
+struct AccentControl: View {
+    @Binding var accent: String
+    @State private var picked = Color.blue
+    @State private var commit: Task<Void, Never>?
+
+    var body: some View {
+        LabeledContent("Accent Colour") {
+            HStack(spacing: 6) {
+                ForEach(Accent.presets, id: \.hex) { preset in
+                    Button { accent = preset.hex; picked = Self.color(preset.hex) } label: {
+                        Circle().fill(Self.color(preset.hex)).frame(width: 16, height: 16)
+                            .overlay(Circle().strokeBorder(Color.primary.opacity(accent == preset.hex ? 0.9 : 0.15), lineWidth: accent == preset.hex ? 2 : 1))
+                    }
+                    .buttonStyle(.plain)
+                    .help(preset.name)
+                    .accessibilityLabel(preset.name)
+                }
+                ColorPicker("Accent Colour", selection: $picked, supportsOpacity: false)
+                    .labelsHidden()
+            }
+        }
+        .onAppear { picked = Self.color(accent) }
+        .onChange(of: picked) { _, new in
+            // The colour panel gives many values while the owner drags. Use the last value.
+            let hex = Self.hex(new)
+            guard hex != accent else { return }
+            commit?.cancel()
+            commit = Task {
+                try? await Task.sleep(nanoseconds: 500_000_000)
+                if !Task.isCancelled { accent = hex }
+            }
+        }
+    }
+
+    static func color(_ hex: String) -> Color {
+        guard let c = try? Accent.parseHex(hex) else { return .blue }
+        return Color(.sRGB, red: Double(c.r) / 255, green: Double(c.g) / 255, blue: Double(c.b) / 255)
+    }
+
+    static func hex(_ color: Color) -> String {
+        let c = NSColor(color).usingColorSpace(.sRGB) ?? .systemBlue
+        func b(_ x: CGFloat) -> Int { min(255, max(0, Int((x * 255).rounded()))) }
+        return String(format: "#%02x%02x%02x", b(c.redComponent), b(c.greenComponent), b(c.blueComponent))
     }
 }

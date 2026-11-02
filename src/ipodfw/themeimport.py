@@ -87,6 +87,9 @@ class Theme:
     # The resources for which the theme keeps Apple's art. None: the default list KEEP_APPLE.
     # A theme with its own progress bar has an empty list.
     keep_apple: list[str] | None = None
+    # False: the changes already hold the colours of the highlight bar (a theme with an accent colour).
+    # The value is not in the file.
+    keep_highlight: bool = True
 
     def to_json(self, stripped: bool = False) -> str:
         """The theme as JSON. `stripped` writes format 2: each change holds the hash of the
@@ -141,7 +144,8 @@ class Theme:
                 continue
             if any(c.offset < e.offset + len(e.new) and e.offset < c.offset + len(c.new) for e in self.edits):
                 continue
-            c = _keep_highlight(c)
+            if self.keep_highlight:
+                c = _keep_highlight(c)
             if c.old != c.new:
                 out.append(c)
         return out + self.edits

@@ -29,6 +29,7 @@ Thus, about 12,600 lines of the app are in Swift. The UI and the helper (about 6
 | `Editor.swift` | `theme.py` (`ipodfw unpack` and `ipodfw repack`) |
 | `DarkMode.swift` | `darkmode.py` |
 | `ThemeImport.swift` | `themeimport.py` |
+| `Accent.swift` | `accent.py` |
 | `Patcher.swift` (C compiler call and ELF linker) | `patcher.py` |
 | `IPSW.swift` | `ipsw.py` |
 | `ITunesDB.swift` | `itunesdb.py` |

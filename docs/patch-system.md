@@ -377,7 +377,7 @@ Each `patch.json` records the size of its code in `size`. The Patches pane shows
 
 Each build of the app writes a list into osos (`FirmwareManifest` in [FirmwareManifest.swift](../mac/Sources/IPodFWKit/FirmwareManifest.swift)). No iPod code reads it. The app reads it from the iPod to show which patches are on the iPod (refer to [app-and-device.md](app-and-device.md#the-patches-on-the-ipod)).
 
-- Format: the text `iPodFirmManifest1` and a zero byte, a 32-bit little-endian length, then JSON with the keys `app`, `patches` (`name`, `version`, `options`), `appearance` and `theme`.
+- Format: the text `iPodFirmManifest1` and a zero byte, a 32-bit little-endian length, then JSON with the keys `app`, `patches` (`name`, `version`, `options`), `appearance`, `theme` and `accent` (only if the accent is not Apple's blue).
 - Place: after the last extended patch and its menus, on a 16-byte step, before the rounding to 0x800 bytes (`Patcher.apply` with `list`). Thus the list never covers the zero variables of a patch.
 - The build writes the list only if the image goes past 0x736800 (an extended patch, a theme or Dark Mode). Else the list would make the build move rsrc. A build without the list operates as before.
 - Size: approximately 110 bytes, plus 45 bytes for each patch. 155 bytes for 1 patch, 560 bytes for 10 patches. The list can make the osos 2 KB larger if it crosses a 0x800 step. The space bar shows it as "iPodFirm list" (`SpaceUse.Part.Kind.list`).

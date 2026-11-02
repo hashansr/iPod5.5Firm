@@ -49,7 +49,7 @@ Use this table to find the documents to update:
 | `Patcher.swift` or `patcher.py` | [patch-system.md](patch-system.md) |
 | `Partition.swift`, `Resources.swift`, `Pictures.swift` or their Python versions | [firmware-format.md](firmware-format.md) |
 | `themes/layouts/Split.ipodtheme`, `re/home-screen-views.py` | [modifications.md](modifications.md), [../re/home-screen.md](../re/home-screen.md) |
-| `ThemeImport.swift`, `DarkMode.swift`, `FirmwareVersion.swift`, `AlbumArt.swift`, `ArtworkDB.swift`, `MusicImport.swift` | [modifications.md](modifications.md) |
+| `ThemeImport.swift`, `Accent.swift`, `accent.py`, `DarkMode.swift`, `FirmwareVersion.swift`, `AlbumArt.swift`, `ArtworkDB.swift`, `MusicImport.swift` | [modifications.md](modifications.md) |
 | `Device.swift`, `Operations.swift`, the helper or `Privileged.swift` | [safety.md](safety.md), [app-and-device.md](app-and-device.md) |
 | A new external program, system API, network connection, file or `UserDefaults` key | [app-and-device.md](app-and-device.md). If the item works only on macOS, also [porting.md](porting.md). |
 | A new Swift module in `IPodFWKit`, a new Python module, or a module that gets its first version in the other language | [porting.md](porting.md) (section 2) |

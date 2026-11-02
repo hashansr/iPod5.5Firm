@@ -26,7 +26,7 @@ All addresses are osos offsets for Apple firmware 1.3. Refer to [The address rul
 | [custom-eq](#custom-eq) | Code patch (extended) | Patches | 1 `bl`, 1 `b`, 2 words (`bytes`) | Version 0.1: yes, a basic test by the owner. Version 0.2 and later: no |
 | [usb-audio-out](#usb-audio-out) | Code patch | Patches | 17 `bl`, 2 `b` and 4 words (3 with `chain`), a Settings menu | Yes (2026-10-17) |
 | [Dark theme](#dark-theme) | Resource data | Patches > iPod Appearance | BMap, View and Type bytes | Yes |
-| [Dark Mode switch](#dark-mode-switch) | Code and data | Patches > iPod Appearance | 1 `b` and 2 vtable words, a compressed table and a menu | Version 1.1: yes (28 October 2026). Version 2.0: yes (3 November 2026) |
+| [Dark Mode switch](#dark-mode-switch) | Code and data | Patches > iPod Appearance | 1 `b` and 2 vtable words, a compressed table and a menu | Version 1.1: yes (28 October 2026). Version 2.0: yes (3 November 2026). Accent colour: not tested on a real iPod |
 | [Move of rsrc](#move-of-rsrc) | Partition layout | Automatic | 1 directory entry | Yes |
 
 ## The build sequence
@@ -866,6 +866,7 @@ An earlier version read the ATA IDENTIFY data in the firmware (a hook at 0x142f9
 - The appearance control: Light, Dark or Switch on iPod.
 - The Layout control: Stock or Split. Refer to [Split layout](#split-layout).
 - The "Dark theme" picker, "Show Import Report" and "Delete Theme…". "Delete Theme…" asks for a confirmation.
+- The "Accent Colour" control: 7 colours and a colour panel. Refer to [Accent colour](#accent-colour).
 
 **Built-in themes.** The app has two themes in [themes/](../themes/). The app copies each theme into `~/Library/Application Support/iPodFirm/Themes/`. At each start it compares the copy with the built-in theme. If they differ, the copy gets the changes of the built-in theme and keeps the owner's `edits` (`ImportedTheme.syncBuiltIn`, `ImportedTheme.updatedCopy`). Before 2 November 2026 the copy of an earlier app stayed, so a changed built-in theme did not reach the iPod. "Classic Dark" is the default (`AppModel.defaultThemeName`). "Dark Gray" is the older theme. Both fit "Switch on iPod" since patch version 2.0. Classic Dark comes from the dark builder of the owner. Refer to [../re/classic-dark.md](../re/classic-dark.md). It differs from Dark Gray in these points:
 
@@ -873,6 +874,15 @@ An earlier version read the ATA IDENTIFY data in the firmware (a hook at 0x142f9
 - The theme file changes the table entry of View 24529 (the charging screen). The entry points at a new element list: a black background and the battery box. The change has the label "View 24529 (table entry)".
 - The theme has dark art for the status icons and the charging screen.
 - The scrollbar thumb (BMap 24351, 11 × 11) is the picture of Dark Gray: grey, not blue. The theme file takes its changes for this picture from Dark Gray (`--borrow`, `borrow_pictures`).
+
+**Accent colour.** The owner can change the blue of Apple to another colour. The control "Accent Colour" in the Dark Theme section sets `AppModel.accent` (the key `accent`, a text `#rrggbb`). The accent works with the appearances Dark and Switch on iPod, and with each theme. The accent #5898e8 is Apple's blue: with it nothing changes, and the build is the same as without the control.
+
+- The selection bar of the Views is a gradient of two colours: 28 64 d0 ff (bottom) and 58 98 e8 ff (top). The theme keeps these colours (`APPLE_HIGHLIGHT`). With an accent, each aligned word with one of these colours in a View element gets the new colours. The top is the accent. The bottom is 0.8 times the accent.
+- 15 pictures hold Apple's blue (`Accent.pictures`, for example the rating star and the clock face). Each pixel that has a saturation above 0.35 and a brightness above 0.15 gets the hue of the accent. The saturation and the brightness change in proportion to Apple's blue. Alpha stays. A pixel never becomes the pure white of the transparent colour of an RGB565 picture. The scrollbar thumb (BMap 24351) is not in the list.
+- `ImportedTheme.withAccent` (Swift) and `accent.with_accent` (Python) make a derived theme. The derived theme applies the theme to the firmware, changes the accent, and then holds the changes of the theme with the new bytes. It adds changes for the bytes that the theme leaves as Apple's bytes. The derived theme has `keep_apple = []` and `keepsHighlight = false`: the highlight rule must not put Apple's blue back. The file of the theme does not change.
+- The build uses the derived theme for Dark and for Switch on iPod (`AppModel.accentedTheme`, with a cache). The accent adds approximately 3300 changes. For Classic Dark with #ff3b30, the switch table is approximately 18 KB larger than with Apple's blue (Python build: 294,132 and 275,994 bytes). The space below the limit is 456,704 bytes.
+- The iPodFirm list has the key `accent` if the accent is not Apple's blue. The Patches pane then shows a different appearance when the accent on the iPod and the selected accent are not the same.
+- A grey accent (saturation 0) makes the selection bar and the pictures grey.
 
 **Source.** An iPodWizard theme is a complete firmware partition for an older firmware, usually 1.2.1. iPodFirm needs the theme and the Apple firmware that the theme came from ("base"). The target is always the Apple firmware 1.3. Refer to [re/dark-theme.md](../re/dark-theme.md).
 

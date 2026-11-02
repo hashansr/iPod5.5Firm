@@ -81,7 +81,8 @@ extension AppModel {
     /// True if the iPodFirm list on the iPod has a different appearance or theme.
     var ipodAppearanceDiffers: Bool {
         guard let list = ipodState?.list, let a = list.appearance else { return false }
-        return a != appearance.rawValue || (a != Appearance.light.rawValue && list.theme != selectedTheme?.name)
+        return a != appearance.rawValue
+            || (a != Appearance.light.rawValue && (list.theme != selectedTheme?.name || (list.accent ?? Accent.apple) != accent))
     }
 
     /// The iPodFirm list for the current switches: the build writes it into the firmware.
@@ -91,7 +92,8 @@ extension AppModel {
                                                             options: $0.options.isEmpty ? nil : $0.options,
                                                             eqs: $0.customEQs.isEmpty ? nil : $0.customEQs) },
                          appearance: appearance.rawValue,
-                         theme: appearance == .light ? nil : selectedTheme?.name)
+                         theme: appearance == .light ? nil : selectedTheme?.name,
+                         accent: appearance == .light || Accent.isApple(accent) ? nil : accent)
     }
 
     /// The patches and the dark-mode patch, for the check of an image.
@@ -132,6 +134,7 @@ extension AppModel {
             if let a = list.appearance.flatMap(Appearance.init(rawValue:)) {
                 if a != .light, let t = list.theme, themes.contains(where: { $0.name == t }) { selectedThemeName = t }
                 if a == .light || themes.contains(where: { $0.name == list.theme }) { appearance = a }
+                if a != .light { accent = (try? Accent.parseHex(list.accent ?? "")) == nil ? Accent.apple : list.accent!.lowercased() }
             }
         }
         switchesChangedSinceSync = false

@@ -26,9 +26,11 @@ public struct FirmwareManifest: Codable, Equatable {
     public var appearance: String?
     /// The name of the dark theme, if the appearance is not "light".
     public var theme: String?
+    /// The accent colour of the dark theme (#rrggbb), if it is not the blue of Apple.
+    public var accent: String?
 
-    public init(app: String, patches: [Entry], appearance: String? = nil, theme: String? = nil) {
-        self.app = app; self.patches = patches; self.appearance = appearance; self.theme = theme
+    public init(app: String, patches: [Entry], appearance: String? = nil, theme: String? = nil, accent: String? = nil) {
+        self.app = app; self.patches = patches; self.appearance = appearance; self.theme = theme; self.accent = accent
     }
 
     public static let magic = Array("iPodFirmManifest1\0".utf8)

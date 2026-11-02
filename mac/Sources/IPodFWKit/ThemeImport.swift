@@ -126,6 +126,9 @@ public struct ImportedTheme: Codable, Equatable, Identifiable {
     /// The resources for which the theme keeps Apple's art. nil: the default list `ThemeImport.keepApple`.
     /// A theme with its own progress bar has an empty list.
     public var keep_apple: [String]?
+    /// False: the changes already hold the colours of the highlight bar (a theme with an accent colour).
+    /// The value is not in the file.
+    public var keepsHighlight = true
 
     enum CodingKeys: String, CodingKey { case format, name, source_sha256, osos_sha256, imported, skipped, changes, edits, keep_apple }
 
@@ -298,7 +301,7 @@ public struct ImportedTheme: Codable, Equatable, Identifiable {
         let keep = keep_apple ?? Array(ThemeImport.keepApple.keys)
         for c in changes where !keep.contains(c.resource) {   // skip: a theme file from an earlier version
             if edits.contains(where: { c.offset < $0.offset + $0.new.count && $0.offset < c.offset + c.new.count }) { continue }
-            let k = Self.keepHighlight(c)
+            let k = keepsHighlight ? Self.keepHighlight(c) : c
             if k.old != k.new { out.append(k) }
         }
         return out + edits

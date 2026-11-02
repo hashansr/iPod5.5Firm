@@ -269,7 +269,7 @@ macOS blocks raw disk access without Full Disk Access. The app tests the permiss
 
 The patch switches are settings of the app. The owner can change a switch and not flash. Thus the app compares the switches with the firmware on the iPod.
 
-1. A build writes the iPodFirm list into osos (`FirmwareManifest`, refer to [patch-system.md](patch-system.md#the-ipodfirm-list)). The list has the patches, their versions and options, the appearance and the theme.
+1. A build writes the iPodFirm list into osos (`FirmwareManifest`, refer to [patch-system.md](patch-system.md#the-ipodfirm-list)). The list has the patches, their versions and options, the appearance, the theme and the accent colour.
 2. When an iPod connects (`NSWorkspace.didMountNotification` and `didUnmountNotification`, then `refreshIPods`), the app reads the osos of the new iPod with the helper command `read` (`AppModel.readIPodPatches`). It reads automatically only with the Touch ID daemon, version 3 or later. In password mode, the owner clicks Read iPod, so that no password prompt opens when an iPod connects.
 3. `Patcher.detect` gives the state of each patch: installed (with the version from the list), absent, or not known. Without a list, the result comes from the changed words, and the versions are not known.
 4. After a flash or a restore, the app uses the image that it wrote (`recordWrittenImage`). It does not read the iPod again.
@@ -392,6 +392,7 @@ The app reads `iPod_Control/iTunes/iTunesDB` and the music files. It does not ch
 | `patchOptions` | The selected choice of each patch option: patch name → option `id` → value (refer to [patch-system.md](patch-system.md#options)). |
 | `appearance` | `light`, `dark` or `switch`. |
 | `darkTheme` | The name of the selected theme. |
+| `accent` | The accent colour of the dark theme (`#rrggbb`). The default is Apple's blue, #5898e8. |
 | `customVersionOn`, `customVersion` | The custom version. |
 | `versionLettersOn` | The patch letters on the About screen. |
 | `requireTouchID` | Touch ID before a write (daemon mode). |
