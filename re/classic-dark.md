@@ -12,11 +12,11 @@ The owner has a dark builder for the stock firmware (the project `iPod5-5.5-Clas
 2. Import the result with the Apple firmware 1.3 as the base and as the target:
 
 ```sh
-ipodfw import-theme dark.fw iPod_25.1.3.ipsw iPod_25.1.3.ipsw --own-progress-bar --grey-tolerance 4 --grey-controls "themes/Dark Gray.ipodtheme" --name "Classic Dark" -o classic-dark.json
+ipodfw import-theme dark.fw iPod_25.1.3.ipsw iPod_25.1.3.ipsw --own-progress-bar --grey-tolerance 4 --borrow "themes/Dark Gray.ipodtheme" --borrow-ids 24351 --name "Classic Dark" -o classic-dark.json
 ipodfw strip-theme classic-dark.json -o "themes/Classic Dark.ipodtheme"
 ```
 
-3. The result has 4612 changes in format 2. It holds no byte of the Apple firmware.
+3. The result has 4576 changes in format 2. It holds no byte of the Apple firmware.
 
 ## What the import adds
 
@@ -27,12 +27,15 @@ The import of an iPodWizard theme skips three items of this theme. Two options o
 | BMap 24342 and 24343 (the progress bar) | The Dark Gray theme makes the bar almost invisible. Classic Dark has a lit track, so that the seek diamond shows. | `--own-progress-bar`. The theme gets `"keep_apple": []`. |
 | View 24529 (the charging screen) | The builder moves the table entry of the View to the data of an unused View. The import compares the structure of the View, so it refused. | Automatic if the base and the target are the same osos. The change is the 8 bytes of the table entry. |
 
-## Grey controls
+## The scrollbar thumb
 
-The owner prefers the scrollbar of Dark Gray. In Dark Gray the second highlight colour (+80) of many elements is grey (`ff343434`). In Classic Dark it is Apple's blue. Option `--grey-controls "themes/Dark Gray.ipodtheme"` of `import-theme` adds one change for each control element, with the label "View N (grey controls)". The change gives the element the colours of Dark Gray. The highlight rule skips changes with this label (`GREY_CONTROLS`, `ThemeImport.greyControls`). List rows (None, BMap and Str elements) keep Apple's blue.
+The owner prefers the scrollbar of Dark Gray. In Classic Dark the thumb is blue. In Dark Gray it is grey.
 
-- 2 November 2026, first try: only the 21 `Cntl` elements. The owner flashed it and sent a photo of the Music list. The scrollbar at the right edge was still blue. Thus the `Cntl` elements are not the scrollbar.
-- Second try: the `Cntl`, `Draw` and `StSt` elements. This gives 36 changes in 34 views. The scrollbar is not a picture: no tall narrow picture is blue in Classic Dark and grey in Dark Gray. Not tested on a real iPod.
+- First try (2 November 2026): a change of the highlight colours of the `Cntl` elements (21 changes). Second try: `Cntl`, `Draw` and `StSt` elements (36 changes). The photos of the owner showed that the thumb stayed blue. The cause of the first photos was an old copy of the theme in the folder of the owner. Refer to [../docs/modifications.md](../docs/modifications.md#dark-theme). The cause of the later photo was that the thumb is a picture. Both tries are removed.
+- Picture 24351 (11 × 11) is the thumb. In the owner's Classic Dark photo the thumb has the colour (41, 101, 206), the flat blue of this picture. Dark Gray has (33, 36, 33). The track (picture 24350) is black in both themes.
+- Option `--borrow "themes/Dark Gray.ipodtheme" --borrow-ids 24351` of `import-theme` replaces the changes for picture 24351 with those of Dark Gray.
+
+Check: the only resources that differ from the image of the dark builder are picture 21997 (the background, stored smaller) and picture 24351 (the thumb). Not tested on a real iPod.
 
 ## Check
 

@@ -56,11 +56,6 @@ KEEP_APPLE = {"BMap 24342": "Apple's progress bar stays (the theme makes it almo
 # The colours of the highlight bar in Apple's Views (element +76 and +80, ABGR). The dark themes
 # make the bar dark grey. The owner wants the blue bar, because it is easier to see.
 APPLE_HIGHLIGHT = (0xFFD06428, 0xFFE89858)
-# The label of a change that sets the colours of a Cntl element. The highlight rule leaves it as it is.
-GREY_CONTROLS = " (grey controls)"
-# The element types that count as controls: a control, a gradient rectangle and a status strip.
-# A list row (None, BMap, Str) keeps Apple's blue.
-GREY_TAGS = ("Cntl", "Draw", "StSt")
 
 
 class ThemeError(Exception):
@@ -189,7 +184,7 @@ class Theme:
 
 def _keep_highlight(c: Change) -> Change:
     """The change with Apple's highlight colours where the theme changes them."""
-    if not c.resource.startswith("View ") or c.resource.endswith(GREY_CONTROLS) or len(c.old) != len(c.new):
+    if not c.resource.startswith("View ") or len(c.old) != len(c.new):
         return c
     new = bytearray(c.new)
     for i in range(-c.offset % 4, len(c.old) - 3, 4):
@@ -447,36 +442,25 @@ def _moved_table_entry(t: "_Image", b: "_Image", n: "_Image", key, nkey) -> Chan
     return Change(_label(nkey) + " (table entry)", nr_.table_pos + 4, old, new)
 
 
-def grey_controls(target_fw: FirmwarePartition, source: Theme, existing: list[Change]) -> list[Change]:
-    """The changes that give the Cntl elements of the target firmware the colours of `source`.
+def borrow_pictures(theme: Theme, source: Theme, ids: list[int]) -> None:
+    """Gives `theme` the pictures with these IDs from `source`, in place of its own pictures.
 
-    A Cntl, Draw or StSt element is a control (for example a scrollbar). Its two highlight colours are
-    at +76 and +80. The theme "Dark Gray" makes them grey. Classic Dark keeps Apple's blue for the lists, and
-    uses these changes to make the controls grey. An element that another change of `existing`
-    touches gets no change."""
-    n = _Image(target_fw)
-    source_osos = bytearray(n.osos)
-    apply_theme(source, source_osos, source.osos_sha256)
-    taken = [(c.offset, c.offset + len(c.new)) for c in existing]
-    out = []
-    for key, r in sorted(n.res.items(), key=lambda kv: kv[1].table_pos):
-        if key[1] != "View":
-            continue
-        block = n.block_of[key]
-        start = block.abs(r)
-        elements = view_elements(n.osos[start:start + r.size])
-        for p, _size, tag, _id in elements or []:
-            at = start + p + 76
-            old, new = n.osos[at:at + 8], bytes(source_osos[at:at + 8])
-            if tag not in GREY_TAGS or old == new or any(a < at + 8 and at < b for a, b in taken):
-                continue
-            out.append(Change(f"{_label(key)}{GREY_CONTROLS}", at, bytes(old), new))
-    return out
+    The two themes must be for the same osos. A picture that `source` does not change stays as it is.
+    For example, Classic Dark takes the scrollbar thumb (picture 24351) from Dark Gray."""
+    if theme.osos_sha256 != source.osos_sha256:
+        raise ThemeError("The two themes are for different firmware.")
+    labels = {f"BMap {i}" for i in ids}
+    new = [c for c in source.changes if c.resource in labels]
+    found = {c.resource for c in new}
+    if found != labels:
+        raise ThemeError("The source theme does not change " + ", ".join(sorted(labels - found)) + ".")
+    theme.changes = [c for c in theme.changes if c.resource not in labels] + new
+    theme.imported = [r for r in theme.imported if r not in labels] + sorted(labels)
 
 
 def make_theme(theme_fw: FirmwarePartition, base_fw: FirmwarePartition, target_fw: FirmwarePartition,
                name: str, source_sha256: str = "", free_area: tuple[int, int] | None = None,
-               own_progress_bar: bool = False, grey_tolerance: int = 0, grey_controls_from: Theme | None = None) -> Theme:
+               own_progress_bar: bool = False, grey_tolerance: int = 0) -> Theme:
     """Make an iPodFirm theme for target_fw from an iPodWizard theme and the firmware that it came from.
 
     free_area is a range of the target osos for a picture that the theme made larger. The default
@@ -485,7 +469,6 @@ def make_theme(theme_fw: FirmwarePartition, base_fw: FirmwarePartition, target_f
 
     own_progress_bar keeps the progress bar pictures of the theme in place of Apple's pictures. Use it
     for a theme that makes the bar visible on black. The theme then has an empty keep_apple list.
-    grey_controls_from gives the Cntl elements the highlight colours of another theme (refer to `grey_controls`).
     grey_tolerance lets a picture count as grey if its colour channels differ by at most this value.
     Then a larger picture, for example the background, is stored as a 4-bit grey picture.
     When the base and the target are the same osos, a View that the theme points at other data keeps
@@ -574,8 +557,6 @@ def make_theme(theme_fw: FirmwarePartition, base_fw: FirmwarePartition, target_f
         if changes:
             theme.changes.extend(changes)
             theme.imported.append(label)
-    if grey_controls_from is not None:
-        theme.changes.extend(grey_controls(target_fw, grey_controls_from, theme.changes))
     return theme
 
 

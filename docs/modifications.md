@@ -872,7 +872,7 @@ An earlier version read the ATA IDENTIFY data in the firmware (a hook at 0x142f9
 - The theme file has `"keep_apple": []`. Thus the theme keeps its own progress bar pictures (BMap 24342 and 24343). Dark Gray has no `keep_apple` list and keeps Apple's pictures (`ThemeImport.keepApple`).
 - The theme file changes the table entry of View 24529 (the charging screen). The entry points at a new element list: a black background and the battery box. The change has the label "View 24529 (table entry)".
 - The theme has dark art for the status icons and the charging screen.
-- The theme has 36 changes with the label "(grey controls)". They give the Cntl, Draw and StSt elements (controls, for example a scrollbar) the highlight colours of Dark Gray: the first colour stays Apple's blue and the second colour is grey `ff343434`. The highlight rule (`APPLE_HIGHLIGHT`) leaves these changes as they are. All other lists keep the blue bar.
+- The scrollbar thumb (BMap 24351, 11 × 11) is the picture of Dark Gray: grey, not blue. The theme file takes its changes for this picture from Dark Gray (`--borrow`, `borrow_pictures`).
 
 **Source.** An iPodWizard theme is a complete firmware partition for an older firmware, usually 1.2.1. iPodFirm needs the theme and the Apple firmware that the theme came from ("base"). The target is always the Apple firmware 1.3. Refer to [re/dark-theme.md](../re/dark-theme.md).
 
