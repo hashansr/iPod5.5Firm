@@ -332,6 +332,31 @@ public extension ImportedTheme {
         out.edits = installed.edits
         return out
     }
+
+    /// Puts the built-in themes of `bundledDir` into the folder of the owner. A theme that the folder
+    /// does not have is copied. A copy that differs from its built-in theme gets the changes of the
+    /// built-in theme (`updatedCopy`). A theme that the owner imported is not changed.
+    static func syncBuiltIn(bundledDir: URL, userDir: URL) {
+        let fm = FileManager.default
+        func themes(in dir: URL) -> [(url: URL, theme: ImportedTheme)] {
+            ((try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? [])
+                .filter { $0.pathExtension == "ipodtheme" }
+                .compactMap { url in (try? ImportedTheme.load(url)).map { (url, $0) } }
+        }
+        let existing = themes(in: userDir)
+        for (url, bundled) in themes(in: bundledDir) {
+            if let have = existing.first(where: { $0.theme.name == bundled.name }) {
+                if let updated = updatedCopy(bundled: bundled, installed: have.theme) { try? updated.write(to: have.url) }
+                continue
+            }
+            let dest = userDir.appendingPathComponent(url.lastPathComponent)
+            if !fm.fileExists(atPath: dest.path) {
+                // At the first start, the folder is not there. Without it, the copy fails (issue 1).
+                try? fm.createDirectory(at: userDir, withIntermediateDirectories: true)
+                try? fm.copyItem(at: url, to: dest)
+            }
+        }
+    }
 }
 
 public enum ThemeImport {

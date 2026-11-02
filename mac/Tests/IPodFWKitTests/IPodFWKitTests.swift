@@ -2996,6 +2996,36 @@ final class ThemeUpdateTests: XCTestCase {
         XCTAssertEqual(updated.edits, [edit])
     }
 
+    /// The files on disk: a missing theme is copied, a changed built-in theme replaces the copy and
+    /// the owner's edits stay, and a theme that the owner imported is not changed.
+    func testSyncBuiltInCopiesAndUpdates() throws {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appendingPathComponent("sync-\(UUID().uuidString)")
+        let bundled = root.appendingPathComponent("bundled"), user = root.appendingPathComponent("user")
+        try fm.createDirectory(at: bundled, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: root) }
+        var built = theme(2); built.name = "Built-in"
+        try built.write(to: bundled.appendingPathComponent("Built-in.ipodtheme"))
+        // the first start: the folder is not there
+        ImportedTheme.syncBuiltIn(bundledDir: bundled, userDir: user)
+        XCTAssertEqual(try ImportedTheme.load(user.appendingPathComponent("Built-in.ipodtheme")).changes, built.changes)
+        // an owner's theme and an owner's edit
+        var mine = theme(9); mine.name = "Mine"
+        try mine.write(to: user.appendingPathComponent("Mine.ipodtheme"))
+        let edit = ThemeChange(resource: "BMap 5", offset: 99, old: Data([1]), new: Data([7]), oldSHA256: nil)
+        var edited = built
+        edited.edits = [edit]
+        try edited.write(to: user.appendingPathComponent("Built-in.ipodtheme"))
+        // a later app changes the built-in theme
+        var newer = theme(3); newer.name = "Built-in"
+        try newer.write(to: bundled.appendingPathComponent("Built-in.ipodtheme"))
+        ImportedTheme.syncBuiltIn(bundledDir: bundled, userDir: user)
+        let copy = try ImportedTheme.load(user.appendingPathComponent("Built-in.ipodtheme"))
+        XCTAssertEqual(copy.changes, newer.changes)
+        XCTAssertEqual(copy.edits, [edit])
+        XCTAssertEqual(try ImportedTheme.load(user.appendingPathComponent("Mine.ipodtheme")).changes, mine.changes)
+    }
+
     func testChangedKeepAppleListGivesAnUpdate() {
         var bundled = theme(2)
         bundled.keep_apple = []

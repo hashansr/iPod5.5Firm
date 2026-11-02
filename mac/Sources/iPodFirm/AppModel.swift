@@ -663,36 +663,16 @@ final class AppModel: ObservableObject {
     // MARK: appearance (dark theme)
 
     static func loadThemes() -> [ThemeFile] {
-        let files = (try? FileManager.default.contentsOfDirectory(at: themesDir, includingPropertiesForKeys: nil)) ?? []
-        var out = files.filter { $0.pathExtension == "ipodtheme" }
-            .compactMap { url in (try? ImportedTheme.load(url)).map { ThemeFile(name: $0.name, url: url, theme: $0) } }
-        // The themes that come with the app (Contents/Resources/Themes). The app
-        // copies a built-in theme into the folder of the owner at the first start,
-        // so the owner can change it like an imported theme.
-        let bundled = Bundle.main.resourceURL.map { $0.appendingPathComponent("Themes") }
-        let builtIn = (try? FileManager.default.contentsOfDirectory(at: bundled!, includingPropertiesForKeys: nil)) ?? []
-        for url in builtIn.filter({ $0.pathExtension == "ipodtheme" }) {
-            guard let theme = try? ImportedTheme.load(url) else { continue }
-            if out.contains(where: { $0.name == theme.name }) { continue }
-            let dest = themesDir.appendingPathComponent(url.lastPathComponent)
-            if !FileManager.default.fileExists(atPath: dest.path) {
-                // At the first start, the folder is not there. Without it, the copy fails (issue 1).
-                try? FileManager.default.createDirectory(at: themesDir, withIntermediateDirectories: true)
-                try? FileManager.default.copyItem(at: url, to: dest)
-                if let copied = try? ImportedTheme.load(dest) {
-                    out.append(ThemeFile(name: copied.name, url: dest, theme: copied))
-                }
-            } else if let copied = try? ImportedTheme.load(dest) {
-                // The copy comes from an earlier app. A built-in theme that changed replaces it. The
-                // pictures that the owner replaced stay.
-                if let updated = ImportedTheme.updatedCopy(bundled: theme, installed: copied), (try? updated.write(to: dest)) != nil {
-                    out.append(ThemeFile(name: updated.name, url: dest, theme: updated))
-                } else {
-                    out.append(ThemeFile(name: copied.name, url: dest, theme: copied))
-                }
-            }
+        // The themes that come with the app (Contents/Resources/Themes). The app copies a built-in
+        // theme into the folder of the owner, so the owner can change it like an imported theme.
+        // A built-in theme that changed replaces the copy.
+        if let bundled = Bundle.main.resourceURL?.appendingPathComponent("Themes") {
+            ImportedTheme.syncBuiltIn(bundledDir: bundled, userDir: themesDir)
         }
-        return out.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        let files = (try? FileManager.default.contentsOfDirectory(at: themesDir, includingPropertiesForKeys: nil)) ?? []
+        return files.filter { $0.pathExtension == "ipodtheme" }
+            .compactMap { url in (try? ImportedTheme.load(url)).map { ThemeFile(name: $0.name, url: url, theme: $0) } }
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
 
     /// The theme that the app selects if the owner selected none.
