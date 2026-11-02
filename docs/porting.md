@@ -30,6 +30,7 @@ Thus, about 12,600 lines of the app are in Swift. The UI and the helper (about 6
 | `DarkMode.swift` | `darkmode.py` |
 | `ThemeImport.swift` | `themeimport.py` |
 | `Accent.swift` | `accent.py` |
+| None. The app only reads the theme file. | `refine.py` (the corrections of the built-in theme Classic Dark, `ipodfw refine-theme`) |
 | `Patcher.swift` (C compiler call and ELF linker) | `patcher.py` |
 | `IPSW.swift` | `ipsw.py` |
 | `ITunesDB.swift` | `itunesdb.py` |

@@ -6,8 +6,8 @@ the same steps and the same rounding, so that the tests can compare them.
 
 - The selection bar of the Views is a gradient of two colours (APPLE_BOTTOM and APPLE_TOP). The
   gradient gets the new colour at the top and 0.8 times the new colour at the bottom.
-- The pictures in ACCENT_PICTURES hold Apple's blue (a scrollbar, switches, the volume bar and so
-  on). Each saturated pixel gets the hue, the saturation and the brightness of the new colour in
+- The pictures in ACCENT_PICTURES hold Apple's blue (the rating star, a button of the Stopwatch,
+  the selected cell of the Screen Lock, the ring of the balls of Brick and so on). Each saturated pixel gets the hue, the saturation and the brightness of the new colour in
   proportion to Apple's blue.
 
 The accent #5898e8 is Apple's blue. With this accent nothing changes.
@@ -28,7 +28,9 @@ APPLE_BOTTOM = bytes.fromhex("2864d0ff")
 
 # The pictures of Apple's firmware 1.3 that hold the accent blue.
 ACCENT_PICTURES = (13981, 13982, 24279, 24403, 24404, 24405, 24406, 24407, 24408, 24409,
-                   25043, 25045, 25046, 25560, 25562)
+                   25043, 25045, 25046, 25560, 25562,
+                   24361, 24362, 24363, 24364, 24365, 24366,
+                   22206, 24394)
 
 SAT_MIN, VAL_MIN = 0.35, 0.15
 

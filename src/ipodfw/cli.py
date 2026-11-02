@@ -113,6 +113,15 @@ def cmd_strip_theme(args) -> None:
     print(f"Wrote {args.output} in format 2 ({len(th.changes)} changes, no bytes of the Apple firmware)")
 
 
+def cmd_refine_theme(args) -> None:
+    from . import refine, themeimport
+    fw, _ = themeimport.load_firmware(args.firmware)
+    th = themeimport.Theme.from_json(Path(args.theme).read_text())
+    out = refine.refine_theme(th, fw, hashlib.sha256(fw.image("osos")).hexdigest())
+    Path(args.output).write_text(out.to_json(stripped=True))
+    print(f"Wrote {args.output} in format 2 ({len(th.changes)} changes before, {len(out.changes)} after)")
+
+
 def cmd_apply_theme(args) -> None:
     from . import themeimport
     fw = load(args.firmware)
@@ -358,6 +367,12 @@ def main(argv: list[str] | None = None) -> None:
     s.add_argument("theme", help="the theme file to read (JSON)")
     s.add_argument("-o", "--output", required=True, help="theme file to write (JSON)")
     s.set_defaults(func=cmd_strip_theme)
+
+    s = sub.add_parser("refine-theme", help="make the corrections of Classic Dark (clock, balls, backgrounds)")
+    s.add_argument("firmware", help="the Apple firmware 1.3 (an .ipsw file)")
+    s.add_argument("theme", help="the theme file to read (JSON)")
+    s.add_argument("-o", "--output", required=True, help="theme file to write (JSON, format 2)")
+    s.set_defaults(func=cmd_refine_theme)
 
     s = sub.add_parser("apply-theme", help="apply an iPodFirm theme to a firmware image")
     s.add_argument("firmware")

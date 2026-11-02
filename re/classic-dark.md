@@ -14,9 +14,10 @@ The owner has a dark builder for the stock firmware (the project `iPod5-5.5-Clas
 ```sh
 ipodfw import-theme dark.fw iPod_25.1.3.ipsw iPod_25.1.3.ipsw --own-progress-bar --grey-tolerance 4 --borrow "themes/Dark Gray.ipodtheme" --borrow-ids 24351 --name "Classic Dark" -o classic-dark.json
 ipodfw strip-theme classic-dark.json -o "themes/Classic Dark.ipodtheme"
+ipodfw refine-theme iPod_25.1.3.ipsw "themes/Classic Dark.ipodtheme" -o "themes/Classic Dark.ipodtheme"
 ```
 
-3. The result has 4576 changes in format 2. It holds no byte of the Apple firmware.
+3. The result has 4064 changes in format 2. It holds no byte of the Apple firmware. The step `refine-theme` is the same on a second run.
 
 ## What the import adds
 
@@ -45,6 +46,24 @@ Apply the theme to the stock firmware with `ipodfw apply-theme`. The result has 
 
 Not tested on a real iPod: the theme in this app. The builder itself ran on a real iPod 5.5G.
 
+## Corrections
+
+The photos of the owner (3 November 2026) showed 6 faults. `src/ipodfw/refine.py` corrects them in the theme file. The tests are in `tests/test_refine.py`.
+
+| Fault | Cause | Correction |
+|---|---|---|
+| The Clock list showed a black square in place of the clock face. | The builder changed the hands (25007 to 25042) with tone curves. Some hands became black squares or near-white squares that cover the face, and some hands disappeared. | The faces (24403 to 24408) and the hands are Apple's art. Apple's faces and hands agree with each other by day and by night. |
+| The balls of Brick had light pixels around them. | The ball pictures (24361 to 24366) have a ring of light grey pixels at the transparent edge. | Each pixel next to a transparent pixel gets a ring colour, a dark blue of the hue of Apple's blue. The pictures are accent pictures, thus the ring follows the accent. |
+| The Time screen had a light background and a blue button. | Four Views draw a light metal texture in code (Draw 24553): 22157 (probably the Stopwatch, its text style is 22199), 22401 and 22402 (probably the Screen Lock) and 22533 (not identified). The Views have no text with the name of the screen, thus the names come from the nearness of the string IDs. The text style 22199 is black. The button is picture 22206. | The element 0 of each View shows the picture 21997 (the fields as in View 24506). The style 22199 has white text. The picture 22206 is an accent picture. |
+| The Screen Lock cell had a white line. | The pictures 24393 and 24394 (the cell and the selected cell, 40 × 37) have a light last row. | The last row has the pixels of the row above. The picture 24394 is an accent picture. |
+
+Not corrected (open):
+
+- The Contacts card keeps its light background. The card draws two textures in code (BMap 28021 and 28022 in View −538, not pictures of the firmware). The text style 27972 is black.
+- The white border of the selected number in Date & Time. The cell is not picture 24394 (it follows the accent). The View of the screen is not found yet.
+
+Not tested on a real iPod: all four corrections.
+
 ## Size with "Switch on iPod"
 
 Version 1.1 of the `dark-mode` patch stored the data of all changes in the switch table (old XOR new). Classic Dark has 783,663 bytes of new data after the background is stored as a 4-bit grey picture. With no other patch, the code of the patch ended 29,425 bytes after the limit 0x7F8000.
@@ -53,7 +72,7 @@ Version 2.0 stores the new bytes with LZ4 and decodes them at the start. Refer t
 
 | Theme | Switch table | "Switch on iPod" adds | Free below 0x7F8000 |
 |---|---|---|---|
-| Classic Dark | 275,992 bytes | 317,440 bytes | 475,136 bytes |
+| Classic Dark | 263,572 bytes | 305,152 bytes | 487,424 bytes |
 | Dark Gray | 268,867 bytes | 311,296 bytes | – |
 
 The decoder was run on the real image of Classic Dark, with the host compiler and the address sanitizer. The result is the same as the theme applied to the Apple firmware, outside the hooks and the menu entry. Real iPod 5.5G (owner, 3 November 2026): the decoder operates with "Switch on iPod". Not tested: the decoder in the emulator.
