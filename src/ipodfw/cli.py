@@ -96,7 +96,9 @@ def cmd_import_theme(args) -> None:
     base_fw, _ = themeimport.load_firmware(args.base)
     target_fw, _ = themeimport.load_firmware(args.target)
     th = themeimport.make_theme(theme_fw, base_fw, target_fw, args.name or Path(args.theme).stem, sha,
-                                own_progress_bar=args.own_progress_bar, grey_tolerance=args.grey_tolerance)
+                                own_progress_bar=args.own_progress_bar, grey_tolerance=args.grey_tolerance,
+                                grey_controls_from=(themeimport.Theme.from_json(Path(args.grey_controls).read_text())
+                                                    if args.grey_controls else None))
     Path(args.output).write_text(th.to_json())
     print(f"Imported {len(th.imported)} resources ({len(th.changes)} changes) -> {args.output}")
     for r, why in th.skipped:
@@ -347,6 +349,8 @@ def main(argv: list[str] | None = None) -> None:
                    help="keep the progress bar pictures of the theme, not Apple's (for a theme that makes the bar visible on black)")
     s.add_argument("--grey-tolerance", type=int, default=0,
                    help="a picture counts as grey if its colour channels differ by at most this value (stores a large background in less space)")
+    s.add_argument("--grey-controls", metavar="THEME",
+                   help="give the Cntl elements (for example a scrollbar) the highlight colours of this theme file")
     s.set_defaults(func=cmd_import_theme)
 
     s = sub.add_parser("strip-theme", help="write a theme in format 2: hashes in place of the Apple bytes")

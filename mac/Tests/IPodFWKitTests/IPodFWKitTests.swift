@@ -2912,6 +2912,17 @@ final class ThemeKeepAppleTests: XCTestCase {
         XCTAssertEqual(try ImportedTheme.load(url).keep_apple, [])
     }
 
+    /// The highlight rule keeps Apple's blue, but not in a change that sets the colours of a control.
+    func testHighlightRuleSkipsGreyControls() {
+        let blue = Data([0x28, 0x64, 0xD0, 0xFF, 0x58, 0x98, 0xE8, 0xFF]), grey = Data([0x28, 0x64, 0xD0, 0xFF, 0x34, 0x34, 0x34, 0xFF])
+        var t = ImportedTheme(name: "t", source_sha256: "", osos_sha256: "")
+        t.changes = [ThemeChange(resource: "View 5", offset: 76, old: blue, new: grey, oldSHA256: nil),
+                     ThemeChange(resource: "View 6" + ThemeImport.greyControls, offset: 76, old: blue, new: grey, oldSHA256: nil)]
+        let out = t.effectiveChanges
+        XCTAssertEqual(out.map(\.resource), ["View 6" + ThemeImport.greyControls])
+        XCTAssertEqual(out[0].new, grey)
+    }
+
     /// The built-in themes load, and Classic Dark uses its own progress bar and charging screen.
     func testBuiltInThemes() throws {
         let dir = PatchAndArtTests.repo.appendingPathComponent("themes")
@@ -2919,6 +2930,7 @@ final class ThemeKeepAppleTests: XCTestCase {
         XCTAssertEqual(classic.keep_apple, [])
         XCTAssertTrue(classic.changes.contains { $0.resource == "BMap 24342" })
         XCTAssertTrue(classic.changes.contains { $0.resource.hasSuffix("(table entry)") })
+        XCTAssertEqual(classic.changes.filter { $0.resource.hasSuffix(ThemeImport.greyControls) }.count, 21)
         let gray = try ImportedTheme.load(dir.appendingPathComponent("Dark Gray.ipodtheme"))
         XCTAssertNil(gray.keep_apple)
     }

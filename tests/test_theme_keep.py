@@ -1,6 +1,7 @@
 """The list keep_apple of a theme: the pictures for which the theme keeps Apple's art."""
 from pathlib import Path
 
+from ipodfw import themeimport
 from ipodfw.themeimport import Change, Theme
 
 REPO = Path(__file__).resolve().parents[1]
@@ -25,9 +26,17 @@ def test_the_list_survives_json():
     assert Theme.from_json(_theme().to_json()).keep_apple is None
 
 
+def test_highlight_rule_keeps_blue_but_not_for_grey_controls():
+    blue = bytes.fromhex("2864d0ff5898e8ff")
+    grey = bytes.fromhex("2864d0ff343434ff")
+    assert themeimport._keep_highlight(Change("View 5", 76, blue, grey)).new == blue
+    assert themeimport._keep_highlight(Change("View 5" + themeimport.GREY_CONTROLS, 76, blue, grey)).new == grey
+
+
 def test_builtin_classic_dark():
     t = Theme.from_json((REPO / "themes/Classic Dark.ipodtheme").read_text())
     assert t.keep_apple == []
     assert any(c.resource == "BMap 24342" for c in t.changes)
     assert any(c.resource.endswith("(table entry)") for c in t.changes)
+    assert len([c for c in t.changes if c.resource.endswith(themeimport.GREY_CONTROLS)]) == 21
     assert Theme.from_json((REPO / "themes/Dark Gray.ipodtheme").read_text()).keep_apple is None

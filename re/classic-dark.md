@@ -12,11 +12,11 @@ The owner has a dark builder for the stock firmware (the project `iPod5-5.5-Clas
 2. Import the result with the Apple firmware 1.3 as the base and as the target:
 
 ```sh
-ipodfw import-theme dark.fw iPod_25.1.3.ipsw iPod_25.1.3.ipsw --own-progress-bar --name "Classic Dark" -o classic-dark.json
+ipodfw import-theme dark.fw iPod_25.1.3.ipsw iPod_25.1.3.ipsw --own-progress-bar --grey-tolerance 4 --grey-controls "themes/Dark Gray.ipodtheme" --name "Classic Dark" -o classic-dark.json
 ipodfw strip-theme classic-dark.json -o "themes/Classic Dark.ipodtheme"
 ```
 
-3. The result has 4576 changes in format 2. It holds no byte of the Apple firmware.
+3. The result has 4597 changes in format 2. It holds no byte of the Apple firmware.
 
 ## What the import adds
 
@@ -26,6 +26,12 @@ The import of an iPodWizard theme skips three items of this theme. Two options o
 |---|---|---|
 | BMap 24342 and 24343 (the progress bar) | The Dark Gray theme makes the bar almost invisible. Classic Dark has a lit track, so that the seek diamond shows. | `--own-progress-bar`. The theme gets `"keep_apple": []`. |
 | View 24529 (the charging screen) | The builder moves the table entry of the View to the data of an unused View. The import compares the structure of the View, so it refused. | Automatic if the base and the target are the same osos. The change is the 8 bytes of the table entry. |
+
+## Grey controls
+
+The owner prefers the scrollbar of Dark Gray. In Dark Gray the second highlight colour (+80) of the `Cntl` elements is grey (`ff343434`). In Classic Dark it is Apple's blue. Option `--grey-controls "themes/Dark Gray.ipodtheme"` of `import-theme` adds one change for each `Cntl` element, with the label "View N (grey controls)". The change gives the element the colours of Dark Gray. The highlight rule skips changes with this label (`GREY_CONTROLS`, `ThemeImport.greyControls`).
+
+Result of 2 November 2026: 21 changes, 23 `Cntl` elements equal to Dark Gray, and no other highlight word is different from Apple's blue. Not known: if the `Cntl` elements are the scrollbar. The list of the elements is a test. Not tested on a real iPod.
 
 ## Check
 

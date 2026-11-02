@@ -306,7 +306,7 @@ public struct ImportedTheme: Codable, Equatable, Identifiable {
 
     /// The change with Apple's highlight colours where the theme changes them.
     static func keepHighlight(_ c: ThemeChange) -> ThemeChange {
-        guard c.resource.hasPrefix("View "), c.old.count == c.new.count else { return c }
+        guard c.resource.hasPrefix("View "), !c.resource.hasSuffix(ThemeImport.greyControls), c.old.count == c.new.count else { return c }
         let old = [UInt8](c.old)
         var new = [UInt8](c.new)
         var i = (4 - c.offset % 4) % 4
@@ -380,6 +380,8 @@ public enum ThemeImport {
     /// The colours of the highlight bar in Apple's Views (element +76 and +80, ABGR). The dark themes
     /// make the bar dark grey. The owner wants the blue bar, because it is easier to see.
     public static let appleHighlight: Set<UInt32> = [0xFFD0_6428, 0xFFE8_9858]
+    /// The label of a change that sets the colours of a Cntl element. The highlight rule leaves it as it is.
+    public static let greyControls = " (grey controls)"
     /// Element tag -> the resource type that the ID at +12 refers to.
     static let elementIDType = ["BMap": "BMap", "Draw": "BMap", "Str ": "Str ", "None": "View"]
 

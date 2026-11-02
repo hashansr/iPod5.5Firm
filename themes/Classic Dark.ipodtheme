@@ -27987,6 +27987,132 @@
    "offset": 5139704,
    "new": "DA==",
    "old_sha256": "beead77994cf573341ec17b58bbf7eb34d2711c993c1d976b128b3188dc1829a"
+  },
+  {
+   "resource": "View 17067 (grey controls)",
+   "offset": 5042384,
+   "new": "KGTQ/zQ0NP8=",
+   "old_sha256": "27887834b852b5fef592d40503a86e67e1a7c405cec59dfab00f161b2b19edb0"
+  },
+  {
+   "resource": "View 17068 (grey controls)",
+   "offset": 5042684,
+   "new": "KGTQ/zQ0NP8=",
+   "old_sha256": "27887834b852b5fef592d40503a86e67e1a7c405cec59dfab00f161b2b19edb0"
+  },
+  {
+   "resource": "View 19329 (grey controls)",
+   "offset": 5046188,
+   "new": "KGTQ/zQ0NP8=",
+   "old_sha256": "27887834b852b5fef592d40503a86e67e1a7c405cec59dfab00f161b2b19edb0"
+  },
+  {
+   "resource": "View 20515 (grey controls)",
+   "offset": 5051460,
+   "new": "KGTQ/zQ0NP8=",
+   "old_sha256": "27887834b852b5fef592d40503a86e67e1a7c405cec59dfab00f161b2b19edb0"
+  },
+  {
+   "resource": "View 22059 (grey controls)",
+   "offset": 5059708,
+   "new": "KGTQ/zQ0NP8=",
+   "old_sha256": "27887834b852b5fef592d40503a86e67e1a7c405cec59dfab00f161b2b19edb0"
+  },
+  {
+   "resource": "View 22060 (grey controls)",
+   "offset": 5060296,
+   "new": "KGTQ/zQ0NP8=",
+   "old_sha256": "27887834b852b5fef592d40503a86e67e1a7c405cec59dfab00f161b2b19edb0"
+  },
+  {
+   "resource": "View 22061 (grey controls)",
+   "offset": 5060588,
+   "new": "KGTQ/zQ0NP8=",
+   "old_sha256": "27887834b852b5fef592d40503a86e67e1a7c405cec59dfab00f161b2b19edb0"
+  },
+  {
+   "resource": "View 22069 (grey controls)",
+   "offset": 5064088,
+   "new": "KGTQ/zQ0NP8=",
+   "old_sha256": "27887834b852b5fef592d40503a86e67e1a7c405cec59dfab00f161b2b19edb0"
+  },
+  {
+   "resource": "View 22070 (grey controls)",
+   "offset": 5064676,
+   "new": "KGTQ/zQ0NP8=",
+   "old_sha256": "27887834b852b5fef592d40503a86e67e1a7c405cec59dfab00f161b2b19edb0"
+  },
+  {
+   "resource": "View 22574 (grey controls)",
+   "offset": 5078952,
+   "new": "KGTQ/zQ0NP8=",
+   "old_sha256": "27887834b852b5fef592d40503a86e67e1a7c405cec59dfab00f161b2b19edb0"
+  },
+  {
+   "resource": "View 22593 (grey controls)",
+   "offset": 5079372,
+   "new": "KGTQ/zQ0NP8=",
+   "old_sha256": "27887834b852b5fef592d40503a86e67e1a7c405cec59dfab00f161b2b19edb0"
+  },
+  {
+   "resource": "View 22593 (grey controls)",
+   "offset": 5079484,
+   "new": "KGTQ/zQ0NP8=",
+   "old_sha256": "27887834b852b5fef592d40503a86e67e1a7c405cec59dfab00f161b2b19edb0"
+  },
+  {
+   "resource": "View 22593 (grey controls)",
+   "offset": 5079596,
+   "new": "KGTQ/zQ0NP8=",
+   "old_sha256": "27887834b852b5fef592d40503a86e67e1a7c405cec59dfab00f161b2b19edb0"
+  },
+  {
+   "resource": "View 22594 (grey controls)",
+   "offset": 5079796,
+   "new": "KGTQ/zQ0NP8=",
+   "old_sha256": "27887834b852b5fef592d40503a86e67e1a7c405cec59dfab00f161b2b19edb0"
+  },
+  {
+   "resource": "View 24074 (grey controls)",
+   "offset": 5083392,
+   "new": "KGTQ/zQ0NP8=",
+   "old_sha256": "27887834b852b5fef592d40503a86e67e1a7c405cec59dfab00f161b2b19edb0"
+  },
+  {
+   "resource": "View 24075 (grey controls)",
+   "offset": 5084036,
+   "new": "KGTQ/zQ0NP8=",
+   "old_sha256": "27887834b852b5fef592d40503a86e67e1a7c405cec59dfab00f161b2b19edb0"
+  },
+  {
+   "resource": "View 24541 (grey controls)",
+   "offset": 5107604,
+   "new": "KGTQ/zQ0NP8=",
+   "old_sha256": "27887834b852b5fef592d40503a86e67e1a7c405cec59dfab00f161b2b19edb0"
+  },
+  {
+   "resource": "View 24544 (grey controls)",
+   "offset": 5108112,
+   "new": "KGTQ/zQ0NP8=",
+   "old_sha256": "27887834b852b5fef592d40503a86e67e1a7c405cec59dfab00f161b2b19edb0"
+  },
+  {
+   "resource": "View 24545 (grey controls)",
+   "offset": 5108612,
+   "new": "KGTQ/zQ0NP8=",
+   "old_sha256": "27887834b852b5fef592d40503a86e67e1a7c405cec59dfab00f161b2b19edb0"
+  },
+  {
+   "resource": "View 24547 (grey controls)",
+   "offset": 5109124,
+   "new": "KGTQ/zQ0NP8=",
+   "old_sha256": "27887834b852b5fef592d40503a86e67e1a7c405cec59dfab00f161b2b19edb0"
+  },
+  {
+   "resource": "View 24549 (grey controls)",
+   "offset": 5109640,
+   "new": "KGTQ/zQ0NP8=",
+   "old_sha256": "27887834b852b5fef592d40503a86e67e1a7c405cec59dfab00f161b2b19edb0"
   }
  ],
  "edits": [],
