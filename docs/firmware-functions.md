@@ -391,6 +391,7 @@ Refer to [re/volume-limit.md](../re/volume-limit.md).
 | 0x1d81cc | UI event handler. Runs in the UI task for each button and wheel event. It adds 1 to the byte UI + 0x44 at a key push (type 4) and subtracts 1 at the release (type 7). `playlist-folders` hooks its first instruction (`push {r4-r8, lr}`). | Static, Emulator, Patch |
 | 0x1d813c | Starts the idle timer again and turns the display on. Called at 0x1d8344 for a button event, not for the wheel events 0x10 and 0x1c. | Emulator |
 | 0x1d8264 | UI event handler part: calls 0x94bbc(4) and then 0x94d80(4, 3000) while the storage is on. | Static |
+| 0x1d81cc (type 0xf) | For a wheel event, the handler calls 0x249054 and, if bit 30 of event + 0x10 is set, 0x1d813c(ui, 0). A push (types 4 and 5) calls 0x1d813c(ui, 1), which turns the display on. UI + 0x18 is the application object, and app + 0x444 is the Backlight Timer in seconds. The patch `wheel-guard` hooks the slot 0x6701f0. Refer to [re/wheel-guard.md](../re/wheel-guard.md). | Static, Patch |
 | 0x1d8570 | 5000 ms timer of key 0x6e (a long push of Play). Posts screen 0x63f2. The handler 0x1d81cc calls it at 0x1d8260 for each event; the code after the call does not use r0. | Static, Patch (`usb-host-probe`) |
 | 0x283e10 | Backlight function. Only the sleep and wake paths call it. | Static |
 | 0x13d524 | Event dispatcher (event, target). Gives the event to the filter objects (slot +0x34), then to the target or to the focused object and its parents (slot +0x30), then deletes it (event slot +4). | Static, Emulator |
@@ -944,6 +945,10 @@ the power chip of the PP5020 of Apple. The facts are Static.
 | 0x264fa4 | Gives the state of the power. The function has a switch with the cases 4 to 0xc. |
 | 0x265abc | Gives the state of the audio. The function has a switch with the cases 4 to 0xc. |
 | 0x1ae774 | Selects the element of the battery view (View 25599): the icon value + 4, or 0x1b for the text 0x63fc. Refer to [re/battery.md](../re/battery.md). |
+| 0x1ae774 | Selects the child of the battery view. The `bl 0x1e7fe4` at 0x1ae838 (mode 0) is only for the picture. The patch `battery-display` hooks it. | Static, Patch |
+| 0x243fb0 | Sets the Type of a label (label, provider, Type ID, redraw). With provider 0, the function does not use the Type ID. | Static |
+| 0x1ae660 | (controller): selects the child with 0x1ae774, then calls 0x1ae6d0 (view, index) for each battery view of the table. The patch `battery-display` hooks the call at 0x1ae6b8. | Static, Patch |
+| 0x244924 (draw) | Reads the text colour from the Type record at label + 0xc8 at each draw, and passes label + 0xb9, + 0xba and + 0xbb to 0x2438bc. | Static |
 | 0x1d91dc | UI timer handler: reads the battery icon value at 0x1d91f8 (0x1e7fe4) and marks the status elements. The patch `battery-log` hooks 0x1d91f8. | Static, Patch |
 | 0x1ae6d0 | (view, index): makes one child of the battery view visible, with method + 0x9c. One caller: 0x1ae6b8. |
 | 0x1ebfec | Reads the switch byte 0x1081dfe3 (`_show_voltage`). If it is set, marks the battery text 0x63fc for a new draw. |

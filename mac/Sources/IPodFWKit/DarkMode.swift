@@ -168,17 +168,18 @@ public enum DarkMode {
 
     /// The switch table for the changes inside osos, with the rules of `ImportedTheme.apply`: a change
     /// is used if the bytes are the old bytes, and left out if they are already the new bytes (the same
-    /// change two times) or other bytes (an edit by the owner).
+    /// change two times) or other bytes (an edit by the owner), or if they are in `owned` (the bytes that a patch changes).
     ///
     /// The table holds the new bytes (the patch only changes the light osos to the dark osos):
     /// "IFD2", u32 count, u32 total size, then for each change: varint zigzag(address - end of the
     /// previous change), varint length * 2 + (1 if LZ4), varint size of the LZ4 block (only with LZ4),
     /// the block or the bytes.
     public static func switchTable(_ theme: ImportedTheme, osos: [UInt8],
-                                   extra: [LayoutRun] = []) -> (table: [UInt8], leftOut: Int) {
+                                   extra: [LayoutRun] = [], owned: [Range<Int>] = []) -> (table: [UInt8], leftOut: Int) {
         var changes: [(at: Int, new: [UInt8])] = [], leftOut = 0
         var work = osos
         for c in theme.withOldBytes(osos).effectiveChanges where c.offset + c.old.count <= osos.count {
+            if owned.contains(where: { $0.overlaps(c.offset..<c.offset + max(c.old.count, 1)) }) { leftOut += 1; continue }
             let cur = work[c.offset..<c.offset + c.old.count]
             guard cur.elementsEqual(c.old) else {
                 if !cur.elementsEqual(c.new) { leftOut += 1 }
@@ -261,7 +262,7 @@ public enum DarkMode {
     /// switch table, the Settings menu and the code of the patch (`codeSize`, the `size` in patch.json).
     /// The value is the same as the layout of `build`. The Patches pane shows it.
     public static func addedSize(partition: FirmwarePartition, osos: [UInt8], theme: ImportedTheme, codeSize: Int,
-                                 layout splitLayout: ImportedTheme? = nil) throws -> Int {
+                                 layout splitLayout: ImportedTheme? = nil, patches: [PatchSpec] = []) throws -> Int {
         let menu = try settingsMenu(partition: partition, osos: osos).0
         var end = themeEnd(theme, osos: osos)
         var extra: [LayoutRun] = []
@@ -270,14 +271,27 @@ public enum DarkMode {
             end = parts.at + parts.view.count
             extra = parts.extra
         }
-        let at = layout(themeEnd: end, table: switchTable(theme, osos: osos, extra: extra).table.count, menu: menu.count)
+        let at = layout(themeEnd: end, table: switchTable(theme, osos: osos, extra: extra, owned: patchRanges(patches)).table.count, menu: menu.count)
         return at.patchAt + codeSize - patchAreaEnd
     }
 
+    /// The byte ranges that the "bytes" of the patches change. The switch table leaves out each change of the
+    /// theme that touches one of them, also if the patch writes the same value as Apple's firmware has.
+    static func patchRanges(_ patches: [PatchSpec]) -> [Range<Int>] {
+        patches.flatMap { p in
+            (p.bytes ?? []).compactMap { b -> Range<Int>? in
+                guard let at = try? Patcher.hex(b.at), let n = try? Patcher.hexBytes(b.expect).count else { return nil }
+                return Int(at)..<Int(at) + n
+            }
+        }
+    }
+
     /// The osos for "Switch on iPod". `osos` can have edits of the owner; `partition` gives its resources.
-    /// With `layout`, both modes have the Split main menu.
+    /// With `layout`, both modes have the Split main menu. `patches` are the patches that the build applies
+    /// afterwards: the table leaves out each change of the theme at a byte that a patch changes.
     public static func build(partition: FirmwarePartition, osos: [UInt8], theme: ImportedTheme, patch: PatchInfo,
-                             originalSHA256: String, layout splitLayout: ImportedTheme? = nil) throws -> ([UInt8], Info) {
+                             originalSHA256: String, layout splitLayout: ImportedTheme? = nil,
+                             patches: [PatchSpec] = []) throws -> ([UInt8], Info) {
         guard originalSHA256 == theme.osos_sha256 else { throw ThemeError("The theme \"\(theme.name)\" is for a different firmware.") }
         let theme = theme.withOldBytes(osos)
         var out = osos
@@ -300,7 +314,7 @@ public enum DarkMode {
             extra = parts.extra
         }
         // 2. the switch table and 3. the Settings menu
-        let (table, leftOut) = switchTable(theme, osos: osos, extra: extra)
+        let (table, leftOut) = switchTable(theme, osos: osos, extra: extra, owned: patchRanges(patches))
         let (menu, res, block) = try settingsMenu(partition: partition, osos: osos)
         let (tableAt, menuAt, patchAt) = layout(themeEnd: end, table: table.count, menu: menu.count)
         // 4. the patch, then the table and the menu

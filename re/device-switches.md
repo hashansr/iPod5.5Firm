@@ -56,7 +56,7 @@ The switch `_enable_options` is not in these tables. It is the gate for all of t
 | Byte | File | Probable effect | Risk |
 |---|---|---|---|
 | 0x1081dfe3 | `_show_voltage` | Shows the raw battery number. **Tested on a real iPod.** The display drops the third digit. Refer to [battery.md](battery.md). | Low |
-| 0x1081dfde | `_show_numeric_volume` | Probably shows the volume as a number. | Low |
+| 0x1081dfde | `_show_numeric_volume` | Gives the text of the `Str` element 0x63ef, the volume level. The patch `volume-number` turns the test on in the code, gives the volume from 0 to 100, and adds a text element to the volume bar. **Tested on a real iPod (version 0.11).** Refer to [numeric-volume.md](numeric-volume.md). | Low |
 | 0x1081dfed | `_show_brightness` | Probably shows the brightness. | Low |
 | 0x1081dfe4 | `_show_speed` | Not known | Not known |
 | 0x1081dffd | `_show_cache_size` | Not known | Not known |

@@ -349,3 +349,166 @@ Next test: find the full value and the charger column.
 2. Clear the log.
 3. Start the iPod, with the charger connected for 15 minutes.
 4. Disconnect the charger and play music for 1 hour.
+
+## The patch `battery-display` (1 November 2026)
+
+The options are in the Patches pane, as the owner asked. There is no row in iPod Settings.
+
+Static results from `DumpCode` and `DecompileAt`:
+
+- 0x1ae838 is the `bl 0x1e7fe4` (mode 0) for the battery picture. Hook only this call. Other callers keep the Apple value.
+- The object in r5 at 0x1e8af8 is the provider for 0x1e7fe4, because the next case calls 0x1e7fe4 with r5.
+- 0x243fb0 uses the Type ID only if the second argument is a provider. The patch gives `str_table` (0x21f3b8).
+- The patch gives the text with the format `%s`. Thus it does not need `%%` in the firmware `sprintf`.
+- Icon + Percent uses the switch, so that the firmware marks the text. The hook then also shows the icon child. It widens the view by 30 pixels and moves the children (child + 0x58).
+
+The provisional table of the patch uses 20.3 hours from raw 438. This is an estimate. The hours from raw 423 are measured, and the 2 hours above raw 423 use the fall in the first log.
+
+Not tested: the text colour with the dark theme, the text width, and if the rectangles stay after a new layout.
+
+Version 0.2 adds the option Smoothing (off by default) and the import of a battery log. The address list of the tables comes from [The tables](#the-tables). The hardware word comes from 0x265164. The owner's iPod has revision 0xb. The other revisions are not tested.
+
+Version 0.3 shows the percentage during a charge. The charge path of 0x1ae774 gives a child that is not the text child, and `hook_show` then also shows the text. In Percent mode, the view goes back to the normal width after the charge. The size of the error during a charge is not known, because no log sample has a charger. This replaces the earlier design with no percentage during a charge.
+
+### Real iPod test of version 0.3 and the change in version 0.4 (3 November 2026)
+
+The owner tested version 0.3 on a real iPod 5.5G with Percent, and sent a photo of the top right corner. The text "10…" replaced the battery icon, in white. The owner wants the icon to stay, with the percentage inside it, in the style of a battery picture with a number. The text must follow the light and dark looks.
+
+What the photo shows:
+
+- The patch and its hooks work. The text comes from the patch.
+- The text is cut. Type 24223 (Podium Sans 18) is too large for the box of 27 × 13 pixels, and the "%" sign adds a character.
+- The text is white. Classic Dark makes Type 24223 white. The Type that the code set (24197, black) did not stay. The cause is not proved. A possible cause is that the firmware reads the Type again when it refreshes the text.
+
+Static results (Ghidra was not used; the disassembly of `osos` with `llvm-objdump`):
+
+- 0x244924 (the draw method of the general label) reads the text colour from the Type record at label + 0xc8 at each draw.
+- 0x243fb0 (label, provider, Type ID, redraw) stores the Type record at label + 0xc8. It then calls 0x21a168, which applies the font, the size and the colour. It also copies the byte Type + 0xd to label + 0xb9.
+- 0x1ae660 selects the child with 0x1ae774 and then calls 0x1ae6d0 for each battery view of the table. 0x1ae6d0 shows the child with the selected index and hides the others. A view with the flag 0x1000000 gets other indexes. The `bl` at 0x1ae6b8 is in this loop.
+- 0x1ae774 gets the provider with method + 0x14 of the object at + 0x14, with the argument 0x6380. A charge (0x1ecc8c not 0) skips the switch byte and selects the pictures 0–3, 25 and 26.
+- Only the Views 25598 and 25599 have the text element 0x63fc. They have 28 elements each: 24 icon pictures, 2 charge pictures, 1 more picture and the text at index 27. Both text elements have the same bytes: the 4 edges are "parent + 0", the Type ID is 24223 (+ 86), and the colour of the highlight is at + 76.
+
+The pictures of the battery (27 × 13 pixels) are light in all the looks that iPodFirm has:
+
+| Look | Battery picture |
+|---|---|
+| Apple (light) | Glossy green on grey, with a blue-grey border. |
+| Classic Dark | The same pictures as the Apple look. The theme does not change them. |
+| Dark Gray | A white body with a green or red fill. The theme replaces the pictures. |
+
+Thus black text is easy to read in each look. White text is not easy to read on the white body of Dark Gray. Classic Dark makes the Types with size 18 white, but not Type 24197 (Espy Sans 10, black). Dark Gray also keeps Type 24197.
+
+Version 0.4 does this:
+
+1. The data of the two Views gives the text element the Type 24197. The left edge is + 1 and the right edge is − 3, so that the text box is inside the body of the icon.
+2. The text has no "%" sign. Three digits ("100") need approximately 18 pixels at size 10.
+3. `hook_show` shows the icon child and the text child together. The text child is later in the list, so it is on top of the icon.
+4. During a charge, the iPod shows the Apple charge picture with no text. The bolt is in the middle of the picture, and the voltage is too high during a charge.
+5. The Percent option is removed. Black text on the black bar of a dark look is not visible. The saved value of the old option is not used, because the option has a new id (`style`).
+
+Not known until a test on the real iPod: if the text is centred in the box, if size 10 fits in the height of the body, and if the percentage is easy to read on the green fill.
+
+### Real iPod test of version 0.4 and the change in version 0.5 (3 November 2026)
+
+The owner tested version 0.4 and sent a photo. The icon stays and the number "100" shows inside it, in black. This is the design that the owner wanted. The owner reports 3 problems:
+
+1. The number is not centred.
+2. The font is not the default font of the iPod.
+3. The number is too large. It takes most of the icon.
+
+The causes, and the changes in version 0.5:
+
+| Problem | Cause | Change |
+|---|---|---|
+| Not centred | Type 24197 has the style bytes 0 0. The byte Type + 0xd is the alignment: 0 left, 1 centre, 2 right. Each font and size has the 3 variants (for example the Types 24152, 24153 and 24154). | Use a Type with Type + 0xd = 1. |
+| Wrong font | Type 24197 is Espy Sans (Str 24118), a small bitmap font. The title and the menus use Podium Sans (Str 24124). | Use Podium Sans. |
+| Too large | Espy Sans 10 gives digits of approximately 7 pixels, and 3 digits fill the body of the icon. | Use size 9, and make the text box 12 pixels high and 22 pixels wide, with its centre at the centre of the icon body. |
+
+All the Podium Sans Types have a size of 14 or more (14, 16, 18, 22, 28). A patch cannot add a Type. The patch changes the size of an existing Type that nothing uses:
+
+- Type 24216 is Podium Sans, size 14, black, style 1 1 (the bold byte is 1 for all Podium Sans Types, and the alignment is the centre).
+- No View uses it. Its ID is only in the table at 0x336190 (0x336590), with no reference in the code or in the scripts. Classic Dark and Dark Gray do not change it.
+- Podium Sans is the file `PodiumSans18.ttf` in rsrc. The renderer scales it, so size 9 is possible. This is not proved on a real iPod.
+
+The body of the icon (27 × 13 pixels) goes from x = 0 to 24, with a tip at x = 24 to 26. The border is approximately 2 pixels. The inner part is x = 2 to 22 and y = 2 to 10. The centre of the inner part is x = 12 and y = 6. The text box is x = 1 to 23 and y = 0 to 12, so its centre is the same.
+
+Not known until a test on the real iPod: if size 9 is easy to read, if the digits are at the correct height in the box, and if 3 digits fit.
+
+### Version 0.5 restarted the iPod; version 0.6 (3 November 2026)
+
+The owner flashed version 0.5 (Podium Sans bold, size 9, centred). The iPod restarted again and again at the Apple logo. The owner put the iPod in disk mode. The recovery is a restore of the backup "before flash".
+
+What is known (static, offline):
+
+- The image that the app flashed (`Staging/flash.bin`) and the backup before it (version 0.4, which started) differ in 10 places of osos. Seven are the data changes of version 0.5. Three are the text of the app version and of the patch version in the JSON text of the Dark Mode data (0x78ff44, 0x78ff49 and 0x79000c). The rsrc and aupd images are the same. The flash was written and verified.
+- Thus the cause is one of these changes of version 0.5: the size of Type 24216 (0x4caf90, 14 to 9), the Type ID of the text (24216), the bottom edge (−1) or the right edge (−4).
+
+The most probable cause (not proved):
+
+- 0x221e24 builds a font from a family, a size and a style. It scans a table of fonts and compares the size (object + 0x48) and the style (object + 0x4c). If no entry has the same values, the result is no font (zero). A draw with no font probably stops the iPod, and the watchdog restarts it. The status bar draws the text at the start.
+- All the Podium Sans Types have the sizes 14, 16, 18, 22 and 28. The firmware has no Podium Sans of size 9.
+- The font file is `PodiumSans18.ttf`, but the table has one entry for each size. A scalable font does not mean that each size is available.
+
+Not proved: the table is in RAM (0x108858e4) and the code that fills it is not found. The emulator is not installed here, so the cause is not tested. The other changes of version 0.5 are less probable causes.
+
+Version 0.6 goes back to the data of version 0.4 (the left edge 1, the right edge −3, no change in the bottom edge) and gives the text the Type 24964. This Type is Espy Sans, size 10, black, like Type 24197 of version 0.4, but its alignment byte is 1 (centre). The font and the size are the same as in version 0.4, which started and drew the text. The patch changes no Type resource. A test checks this.
+
+Choices for a smaller or other font (all in the firmware as a Type with a size that a stock View uses):
+
+| Font | Size | Bold | Remark |
+|---|---|---|---|
+| Espy Sans | 10 | no | Version 0.4 and version 0.6. Not the default font of the iPod. |
+| Pixo | 7 | yes | Used by stock Views (Type 24170, left). The centred variant is Type 24171, which no stock View uses. Smaller. |
+| Podium Sans | 14 | yes | The default font. Too large for the icon (the inner part is 9 pixels high). |
+
+A Podium Sans of a smaller size needs a new entry in the font table. This needs more research of 0x25454c and of the code that makes the table, and a test in the emulator.
+
+### Real iPod test of version 0.6 and the change in version 0.7 (3 November 2026)
+
+The owner flashed version 0.6 over the version that restarted. The iPod starts. The photo shows the number "100" inside the green icon, in black. The owner reports:
+
+- The text is not in the middle (middle and centre).
+- The font looks wrong. It must be the default font of the iPod, smaller and bold.
+
+What the photo shows: the number is nearly centred, but it fills 77 % of the width of the icon body. Its centre is approximately 1 pixel lower than the centre of the inner part. The text is thin. Thus the size and the weight make the number look off, and the vertical position is a little low.
+
+Changes in version 0.7:
+
+1. The text box is the inner part of the icon body: x = 2 to 22 and y = 2 to 11 (the four edge values). The box is the same on each side, so the centred text is in the middle of the icon.
+2. The Type is 24171: Pixo, size 7, bold, centred, black. A stock View uses the font and the size (Type 24170 in the Views 22594, 24658 and 25522). The alignment byte of a Type is not part of the font lookup (0x221e24 compares the size and the style byte at Type + 0xc). Version 0.6 confirmed this for the alignment: Type 24964 gave a centred text with the font of Type 24197.
+
+The font is not Podium Sans. Podium Sans is the default font, but the smallest Podium Sans that the firmware has is size 14. A digit of size 14 is approximately 10 pixels high, and three digits are approximately 24 pixels wide. The inner part of the icon is 21 × 9 pixels. A smaller Podium Sans needs a new entry in the font table:
+
+- 0x25e844 fills the table at RAM 0x108858e4 with entries of 16 bytes. An entry is made by 0x1d0194 (entry, a, b, flag): byte 0 = (a is not 0), byte 1 = flag, + 4 = a, + 8 = b, + 0xc = 0. The values a and b come from RAM variables (0x10823338 and others) that other code sets.
+- 0x221e24 (descriptor, family, size, style) scans the entries and compares the size at object + 0x48 and the style at object + 0x4c. It returns zero if no entry matches.
+- Not known: where the sizes of Podium Sans (14, 16, 18, 22 and 28) come from, and if the file `PodiumSans18.ttf` can give a size of 9.
+
+Next step for a Podium Sans of size 8 to 10: find the code that sets the variables of the entries, and test in the emulator, not on the real iPod.
+
+Not known until a test on the real iPod: if Pixo 7 bold is easy to read, if 3 digits fit in the box, and if the number is in the middle.
+
+### Real iPod test of version 0.7 and the change in version 0.8 (3 November 2026)
+
+The owner flashed version 0.7 (Pixo 7 bold, box x = 2 to 22 and y = 2 to 11) and reports that it looks much better. The owner asks for these changes:
+
+1. The number must be in the middle of the icon. It looks bottom-aligned.
+2. The icon looks darker. It must have the default colour of the iPod.
+3. At 100 %, show only the green full battery (the default). Show the number only below 100 %.
+4. The font must be a little smaller.
+
+What the photo shows (the iPod was held sideways; the crop is turned back):
+
+- The icon is 13 pixels high. The digits fill the rows 4 to 10 (7 pixels). The inner part of the icon is the rows 2 to 10. Thus the gap above the digits is 2 pixels, and the gap below is 0 pixels. The text is 1 pixel too low. Pixo 7 is bottom-aligned in the box.
+- Horizontally, the digits fill the columns 4 to 20, and their centre is the centre of the inner part (column 12). The horizontal position is correct.
+- The three digits are approximately 16 pixels wide in an inner part of 21 pixels.
+
+Changes in version 0.8:
+
+1. The box is 1 pixel higher: the top edge is + 1 and the bottom edge is − 3 (the box is y = 1 to 10). The digits are then in the rows 3 to 9, in the middle of the inner part.
+2. At 100 %, `hook_show` shows only the icon child (the Apple picture of a full battery) and not the text. The percentage comes from the last text, or from an estimate with the raw value before the first text. Below 100 %, the text and the icon show together, as in version 0.7.
+3. The icon pictures are not changed in any version. The icon is the Apple picture of the selected level. The darker look probably comes from the black text on the green fill. A bold digit covers a large part of the icon, and the digits are anti-aliased. At 100 %, the icon now shows with no text. The cause is not proved, because the photos do not give the colour values. If the icon is still dark below 100 %, the next test is to show the icon with the text of a lighter style.
+4. The size is not changed. Pixo 7 is the only Pixo size that a stock View uses. The Pixo sizes 5, 6, 8 and 9 have Types, but no stock View uses them, and the font lookup (0x221e24) gave no font for an unknown size in version 0.5. With the 1 pixel margin above and below the digits, the number looks smaller in the icon. A try with Pixo 6 (Type 24168) can restart the iPod. It is not done without the permission of the owner.
+
+## Version 0.11: the switch table undid the flag byte (4 November 2026)
+
+The owner flashed versions 0.9 and 0.10 (the byte + 92 of the text was 0 and then 0x10). The text stayed white. The setting of the app was Switch on iPod with Classic Dark. The build made the switch table from Apple's firmware, so the table held the change "byte + 92: 0 to 0x0c" for both Views. At the start of the iPod in the dark mode, the table wrote the value again over the value of the patch. The test `testSwitchTableKeepsPatchBytes` shows the byte 0x0c after the table (old rule) and 0 (new rule). A Pixo text with the flag 0x0c is white, also with the black Type 24171, as the header text "1 of 3812" shows. Version 0.11 uses the value 0 and the new rule: the table leaves out each change at a byte that a patch changes.

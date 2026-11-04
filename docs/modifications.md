@@ -24,6 +24,9 @@ All addresses are osos offsets for Apple firmware 1.3. Refer to [The address rul
 | [cover-flow](#cover-flow) | Code patch | Patches | 3 words (2 vtable slots and 1 literal) | Version 0.6.7: yes (27 October 2026). Version 0.6.8: yes (28 October 2026) |
 | [up-next](#up-next) | Code patch (extended) | Patches | 1 `bl`, 1 `b` and 2 vtable words (3 with `chain`), a Settings menu | Version 0.4: yes. Version 0.5: yes (28 October 2026) |
 | [custom-eq](#custom-eq) | Code patch (extended) | Patches | 1 `bl`, 1 `b`, 2 words (`bytes`) | Version 0.1: yes, a basic test by the owner. Version 0.2 and later: no |
+| [battery-display](#battery-display) | Code patch (test, extended) and data | Patches | 4 `bl` and 12 data changes | Version 0.3 and 0.4: partly (3 November 2026). Version 0.5: failed (the iPod restarted). Versions 0.6 to 0.10: start (0.8 to 0.10: white digits). Version 0.11: works |
+| [wheel-guard](#wheel-guard) | Code patch (test, extended) | Patches | 3 `word` and 1 `b` (all with `chain`), a Settings item | Version 0.1: yes (owner, 3 November 2026). Version 0.2: no |
+| [volume-number](#volume-number) | Code patch (test, extended), data and a View | Patches | 1 `bl`, 1 instruction word, 1 View element, 1 Type colour | Versions 0.1 to 0.4: partly. Versions 0.5 to 0.8: no. Version 0.9: the colour is known, the size is too large. Version 0.10: right size, but black. Version 0.11: works (owner, 4 November 2026) |
 | [usb-audio-out](#usb-audio-out) | Code patch | Patches | 17 `bl`, 2 `b` and 4 words (3 with `chain`), a Settings menu | Yes (2026-10-17) |
 | [Dark theme](#dark-theme) | Resource data | Patches > iPod Appearance | BMap, View and Type bytes | Yes |
 | [Dark Mode switch](#dark-mode-switch) | Code and data | Patches > iPod Appearance | 1 `b` and 2 vtable words, a compressed table and a menu | Version 1.1: yes (28 October 2026). Version 2.0: yes (3 November 2026). Accent colour: not tested on a real iPod |
@@ -848,6 +851,97 @@ Each active band of each EQ gets the next filter number (`CustomEQ.library`). 5 
 
 **Test status.** Emulator, version 0.7 (31 October 2026): the firmware starts with 14 EQs and 42 filters, and the list in memory has all the names in sorted sequence with correct values, to filter 96. Version 0.9 repeats the test with 5 EQs and 25 filters. The owner reports that multiple EQs operate (version 0.7, 31 October 2026). The report does not say if an EQ above filter 59 was selected. Emulator, version 0.1 (31 October 2026): the firmware starts, and the list has "Custom" between "Classical" and "Dance" with the value 5500 for one band. Real iPod, version 0.1 (the owner, 31 October 2026): the patch operates. The precut made the music quieter. The band settings are not recorded. App, version 0.4 (the owner, 31 October 2026): export and import, a double-click on the file, and the rejection of a damaged file operate. Version 0.2, the CPU load with 5 bands and USB-C audio are not tested on the real iPod.
 
+## volume-number
+
+**User interface.** Patches pane > Volume Number, letter `e`, version 0.11 (a test version), 24 bytes. It is a test patch: turn on **Enable Test Patches** to see it. It has no option.
+
+**Effect.** The volume bar of Now Playing shows the volume as a white number from 0 to 100, in the middle of the bar, in Podium Sans 16 (bold). The number changes while the owner turns the wheel.
+
+**Research.** Refer to [re/numeric-volume.md](../re/numeric-volume.md).
+
+**Changes.**
+
+| Kind | At | Expect | Value | Meaning |
+|---|---|---|---|---|
+| bytes | 0x1e8a24 | `0000d2e5` | `0100a0e3` | The test of the switch byte for the `Str` 0x63ef is `mov r0, #1`. |
+| bytes | 0x4cb014 | `000000` | `ffffff` | The colour of the Type 24227 (Podium Sans 16, bold, centred) is white. |
+| `bl` | 0x1e8a30 | 0xe595240c | `hook_volume_level` | In place of `ldr r2, [r5, #0x40c]`: the number for the `Str` 0x63ef. |
+
+`hook_volume_level` (naked, 6 instructions) gives `(output volume × 100 + 128) >> 8` in r2, where the output volume is app + 0x40c (0 to 256). It does not change the flags. The field app + 0x758 is 0 when the wheel changes the volume, because the slider sets the volume directly. Thus the patch does not use it.
+
+**New element.** `view_elements` adds one `Str` element at the end of the element list of View 24544, the volume bar of Now Playing (96 bytes). The ID is 0x63ef and the data group is 0x6380. The box is 50 × 18 pixels, 17 pixels below the top of the 73-pixel View, with the centre at the centre of the slider (the left edge is 131 pixels). The field at element + 24 is 0x01000a00. The bit 0x01000000 makes the label centre its text up and down (`0x2438bc`). The Type is 24227 (Podium Sans 16, bold, centred). The byte + 92 is 0x0c.
+
+**Colour.** Version 0.9 showed four elements with the Type 24223 (white in Classic Dark): with the byte + 92 = 0 the number was black, and with 0x0c it was white. Version 0.10 used the Type 24227 (black) with 0x0c, and the number was black. Thus a text with the byte 0x0c has the colour of its Type, and a text with the byte 0 is black. Version 0.11 changes the colour of the Type 24227 to white (osos offset 0x4cb014, `bytes` entry). No stock View uses this Type. The black number of the versions 0.2 to 0.6 was the new element itself, with the byte 0. The firmware draws no number of its own.
+
+**Position.** Version 0.9 (Podium Sans 18, a box from 20 to 38) showed the digits about 3 pixels too low and too large. Version 0.10 uses the size 16 and moves the box up by 3 pixels. The patcher puts the new copy of View 24544 after the end of the image. Refer to [View elements](patch-system.md#view-elements).
+
+**Limits.** The copy of the View does not follow the Dark Mode switch. The number is white in each look. White is easy to read on the blue part of the bar and less easy on the light grey part (a low volume). With the Apple limit of the volume (no `volume-unlimit` patch), the highest output volume gives 84.
+
+
+**Test status.** Swift tests (3 November 2026), with the real firmware: the changed words, the hook, and the copy of View 24544 with the new element. Real iPod (the owner, 3 November 2026): version 0.1 showed no number in Now Playing. Version 0.2 showed the number, but it was always 0, black, cut off at the bottom and not centred. Version 0.3 (Pixo 7, black): the owner asked for the default font, white in the dark looks. Version 0.4 (Podium Sans 18, Type 24223): the size was good, but the number was low in the bar, the bottom of the digits was cut off, and the text was black in the dark look. Version 0.5 (Type 24224, white, and the centring bit): the number did not change, also after a hard reset (the image on the iPod had the new bytes). Version 0.6 (the new element has the ID 0x63f1): no change. Version 0.7 (only the text 0x63f1 is on, and the data group of the new element is 0x2b00, as the slider has): no number at all. Thus the black number came from the request for the ID 0x63ef, and the new element did not draw. Version 0.8 (a probe with four elements and both texts on): the numbers showed, but the bar broke (the new elements were in the middle of the list). Version 0.9 (the owner, 3 November 2026): the bar is normal, the numbers with the byte 0x0c are white, and the others are black. The size is too large and the digits are low. Version 0.10 (the owner, 4 November 2026): the size, the alignment and the font are correct, but the number is black. Version 0.11 (the owner, 4 November 2026): works. The number is white, centred and the right size. Swift tests, with the real firmware: the changed words, one hook, the white Type, and the copy of View 24544 with 6 elements.
+
+## wheel-guard
+
+**User interface.** Patches pane > Wheel Wake Guard, letter `g`, version 0.2, 1115 bytes. It is a test patch: turn on **Enable Test Patches** to see it. It has no option in the app. On the iPod, Settings > Wheel Guard (after Clicker) turns the guard On or Off. A selection of the item changes the value.
+
+**Effect.** When the screen light is off, the wheel does nothing until the owner pushes a button. The time of the screen light is the time of Settings > Backlight Timer. The buttons operate as before. With Backlight Timer Off or Always On, or with Wheel Guard Off, the patch does nothing.
+
+**Research.** Refer to [re/wheel-guard.md](../re/wheel-guard.md).
+
+**Settings item.** Key 0x60007e20, label ID 0x7e21 ("Wheel Guard"), after Clicker (0x60006088), a copy of Sound Check (`settings_items`). The value text is the firmware text "On" (0x602e) or "Off" (0x602f), so it follows the language of the iPod. The label is in English for all languages. The iPod keeps the value in the file `iPod_Control/iTunes/iPodFirmWheelGuard` (one character, `0` or `1`). The patch reads it at the first View lookup. Without the file, the guard is On and the patch writes the file. A selection of the item changes the value, writes the file, and sends the notice `Bool` (method + 0x54 of the settings object), as `up-next` does.
+
+**Hooks.**
+
+| Kind | At | Expect | To | Function |
+|---|---|---|---|---|
+| `word` (`chain`: `ui_next`) | 0x6701f0 | 0x001d81cc | `hook_ui_guard` | The slot of the UI event handler. `cover-flow` uses the same slot, so the guard chains to it. |
+| `b` (`chain`: `lookup_next`, `chain_default`: `lookup_original`) | 0x21f254 | 0xe92d40f8 | `hook_lookup` | The general lookup: the label text, and the first read of the file. |
+| `word` (`chain`: `get_next`) | 0x66c94c | 0x00190b00 | `hook_settings_get` | The value text of the item. |
+| `word` (`chain`: `set_next`) | 0x66c950 | 0x001919d8 | `hook_settings_set` | The change of the value. |
+
+**Runtime logic.**
+
+1. At the first event, `started` is set and `last_use` is the time now. The time is the microsecond timer 0x60005010.
+2. A key push (type 4) sets `last_use`.
+3. A wheel event (type 0xf) reads the Backlight Timer at app + 0x444 (the application object is at UI + 0x18). The limit is the time plus 1 second. 0xfffe is 10 seconds. 0, 0xffff and values above 3600 give no limit. If Wheel Guard is Off, there is no limit.
+4. If the time since `last_use` is the limit or more, the hook returns 1 and the event stops. `last_use` does not change. Else it sets `last_use`.
+5. All other events, and the accepted events, go to the chain.
+6. A change of Wheel Guard to On sets `last_use`, so that the wheel works for the first Backlight Timer.
+
+**Limits.** The screen light can still come on at a touch of the wheel. The timer wraps after 71 minutes, and then the wheel works until the next push.
+
+**Test status.** Swift tests (3 November 2026), with the real firmware: the slot points to the hook, the guard chains to `cover-flow`, and the Settings menu has the key after Clicker together with the item of `up-next`. Real iPod, version 0.1 (the owner, 3 November 2026): the guard works. Version 0.2 (the Settings item): not tested on a real iPod.
+
+## battery-display
+
+**User interface.** Patches pane > Battery Display, letter `t`, version 0.11. It is a test patch: turn on **Enable Test Patches** to see it. The option "Display" gives Icon or Icon + Percent (the default). The option "Battery Data" gives Apple or Custom Battery. The option "Smoothing" gives Off (the default) or On. The tool `battery-curve` gives the section "Battery Curve": **Import Log File…** and **Use the Built-In Curve**. This fork does not have the patch `battery-log`. Thus the log file comes from the `upstream/battery-display` branch, or from an earlier log. To change an option or the curve, flash the iPod again.
+
+**Effect.** The status bar shows the Apple battery icon. Below 100 %, the percentage shows inside the icon. At 100 %, the iPod shows only the Apple picture of a full battery. The text uses the Pixo font, size 7, bold and centred, in the middle of the icon body. It is black and has no "%" sign. The icon pictures are the Apple pictures, with no change. The icon body is light in the Apple look, in Classic Dark and in Dark Gray. Thus the black text is easy to read in each look. During a charge, the iPod shows the Apple charge icon with no percentage. With Custom Battery, the battery picture and the percentage use a curve from a larger battery. The firmware logic for a low battery does not change.
+
+**Data bytes.** The patch changes 5 values in each of the Views 25598 and 25599. They are in the `Str` element 0x63fc (the last element, index 27), at element + 36, + 48, + 60, + 72 and + 86:
+
+| At element + | Old | New | Meaning |
+|---|---|---|---|
+| 36 | 0 | 1 | The top edge of the text: 1 pixel inside the icon. |
+| 48 | 0 | 2 | The left edge: 2 pixels inside. |
+| 60 | 0 | −3 | The bottom edge: 3 pixels inside. |
+| 72 | 0 | −5 | The right edge: 5 pixels inside. The icon tip is at the right. |
+| 86 | 24223 | 24171 | The Type of the text: Pixo, size 7, bold, centred, black. |
+
+The text box is then x = 2 to 22 and y = 1 to 10. The text of Pixo 7 is bottom-aligned in this box, so its digits are in the rows 3 to 9, which is the middle of the inner part of the icon (rows 2 to 10). The patch changes no font record (no `Type` resource). The osos offsets of the View values are 0x4e4b00, 0x4e4b0c, 0x4e4b18, 0x4e4b24 and 0x4e4b32 (View 25598), and 0x4e564c, 0x4e5658, 0x4e5664, 0x4e5670 and 0x4e567e (View 25599). Classic Dark and Dark Gray change other bytes of the same elements (colours and + 92), but they keep these bytes.
+
+**Text colour.** Versions 0.8 to 0.10 showed white digits in the dark look. The cause was the switch table of Switch on iPod: it was made from Apple's firmware, and at the start of the iPod it wrote the flag byte + 92 of the text (Classic Dark: 0 to 0x0c) again over the value of the patch. A Pixo text with the flag 0x0c is white, also with a black Type. Version 0.11 sets the byte + 92 to 0 in both Views (osos offsets 0x4e4b38 and 0x4e5684), and the switch table now leaves out the changes at the bytes of a patch (refer to the section Switch on iPod). The `bytes` entry has `also_expect` 0c, because a dark look that the app applied before the patch (Dark) gives 0x0c.
+
+**Fonts.** The firmware finds a font by its family, its size and its style. If the firmware has no font with these values, the lookup gives no font, and the iPod restarts (0x221e24, refer to [../re/battery.md](../re/battery.md)). Use only a font, a size and a bold value that a stock View uses. Pixo size 7 bold is used by the Views 22594, 24658 and 25522 (Type 24170). The alignment byte of a Type is not part of the lookup, so Type 24171 (the centred variant of 24170) uses the same font. The smallest Podium Sans in the firmware is size 14. It is too large for the icon.
+
+**Method.** 4 `bl` hooks. 0xb4abc sets the byte of `_show_voltage` after the read of the switches. The firmware then selects the text child of the battery view. 0x1e8af8 gives the text of the percentage. 0x1ae838 gives the icon value of the battery picture, for Custom Battery in the mode Icon. 0x1ae6b8 shows the icon child (child 4 + the icon value) together with the text child. The icon is the earlier child, so the text is drawn on top of it. At 100 % (the last percentage, or an estimate from the raw value before the first text), the hook shows only the icon child, which is the Apple picture of a full battery. The icon value comes from the last text. Before the first text, the hook calculates it from the raw value. Apple data is the icon value × 5. Custom Battery uses the average of the last 8 raw values, read at most each 30 seconds, and a curve of 16 points. Smoothing uses 32 values and hides a rise of less than 5 %. With Apple data, Smoothing calculates a line between the 15 limits of the firmware table. The patch asks the firmware for the icon value one time for each text, because the firmware lets the icon fall only one step for each call. `BatteryCurve.make` makes a curve from the longest run of a log. The run starts at its highest value.
+
+**Caution.** The built-in Custom Battery curve is provisional. It does not start from a full charge, and it is for one battery. An imported log must start from a full charge and continue until the iPod stops. The app cannot prove this.
+
+**Test status.** Swift tests (3 November 2026), with the real firmware: the data changes, the 4 hook words, no change in any Type resource, and a build after Classic Dark and after Dark Gray. Version 0.3, real iPod 5.5G (owner, 3 November 2026): the percentage showed, but it replaced the icon, and the text was cut ("10…"). Version 0.4: the percentage showed inside the icon, but it was not centred, in the Espy Sans font and too large. Version 0.5 (Podium Sans, size 9, a changed Type record): the iPod restarted again and again at the Apple logo, and a restore was necessary. Version 0.6 (Espy Sans 10, centred): the iPod started and showed the number. Version 0.7 (Pixo 7 bold, box y = 2 to 11): the owner reports that it looks much better, but the number is 1 pixel too low, the icon looks darker, and the number must show only below 100 %. Version 0.8 moves the box up by 1 pixel and shows only the full icon at 100 %. Version 0.8 (owner, 3 November 2026): the digits are white in a dark look, and the owner wants black. Version 0.9 sets the byte + 92 to 0, and version 0.10 sets it to 0x10: the digits stayed white (the switch table wrote 0x0c again). Version 0.11 keeps the byte at 0 with the new rule: works (owner, 4 November 2026).
+
+**Research.** Refer to [re/battery.md](../re/battery.md).
+
 ## Storage type
 
 The two flash patches are not for the original hard drive. iPodFirm does not read the storage model. It uses the size of the iPod disk:
@@ -873,6 +967,7 @@ An earlier version read the ATA IDENTIFY data in the firmware (a hook at 0x142f9
 - The theme file has `"keep_apple": []`. Thus the theme keeps its own progress bar pictures (BMap 24342 and 24343). Dark Gray has no `keep_apple` list and keeps Apple's pictures (`ThemeImport.keepApple`).
 - The theme file changes the table entry of View 24529 (the charging screen). The entry points at a new element list: a black background and the battery box. The change has the label "View 24529 (table entry)".
 - The theme has dark art for the status icons and the charging screen.
+- Both themes have changes (in `changes`) for the brightness pictures BMap 24286 and 24287 (the sun icons of the brightness bar). Apple draws the rays in dark grey, so the rays do not show on the black background, and the icons looked like two yellow dots. The changes colour the rays gold (255, 204, 51). The rays are the dark pixels outside the body of the sun (more than 1.2 pixels from the farthest light pixel). The pictures 24294 and 24295 (white suns) are not changed. An update of a built-in theme reaches the owner only through `changes` (`ImportedTheme.updatedCopy` compares `changes`). A change in `edits` stays in the file of the repository and does not reach the copy of the owner. The test `SunIconTests` checks the pixels.
 - The scrollbar thumb (BMap 24351, 11 × 11) is the picture of Dark Gray: grey, not blue. The theme file takes its changes for this picture from Dark Gray (`--borrow`, `borrow_pictures`).
 - Corrections (3 November 2026, `refine.py`, `ipodfw refine-theme`): the clock faces and hands are Apple's art again, the balls of Brick have a ring in the accent colour, the cells of the Screen Lock have no white line, the dial of the Screen Lock has a dark bezel and knob, the button 22206 is new (flat, with a ring), the icon "New Clock" (24407 and 24408) is new (smooth, ARGB4444), and four screens show the dark background in place of the light metal texture. Refer to [../re/classic-dark.md](../re/classic-dark.md#corrections).
 
@@ -999,6 +1094,8 @@ The iPod then starts in the light mode. The test `test_decoder_in_dark_mode_c_ag
 
 - "Size on iPod (Dark)": the theme data after 0x736800 (`ImportedTheme.addedSize`).
 - "Size on iPod (Switch on iPod)": items 1 to 4 above, with the alignment (`DarkMode.addedSize`). It needs the open firmware 1.3.
+
+**Bytes of the patches.** The build applies the patches after the switch table is made. The switch table leaves out each change of the theme that touches a byte that a patch changes (`DarkMode.patchRanges`, the `bytes` section of the patch). This is also correct if the patch writes the value that Apple's firmware has. Without this rule, the table wrote the old value of the theme again when the iPod started in the dark mode, and it undid the change of the patch. The test `testSwitchTableKeepsPatchBytes` makes sure of this. The size that the app shows for Switch on iPod does not include this rule and can be a few bytes too large.
 
 The tooltip of the row "Size on iPod (Dark)" gives the bytes inside osos that the theme changes (`ImportedTheme.changedSize`). These changes use no new space. The measured values for the theme "Dark Gray" are 38,428 bytes (Dark), 311,296 bytes (Switch on iPod, with the compressed table of patch version 2.0; it was 738,593 bytes with the XOR table of version 1.1) and 660,678 changed bytes. For "Classic Dark" the table has 258,354 bytes and "Switch on iPod" adds 301,056 bytes (3 November 2026, after the corrections). The limit of the area is 792,576 bytes (0x736800–0x7F8000; 759,808 bytes before 9 October 2026). The test `testExtendedPatchAfterSwitchBuild` makes sure that `DarkMode.addedSize` agrees with `DarkMode.build`.
 

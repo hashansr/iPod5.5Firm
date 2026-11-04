@@ -1,0 +1,59 @@
+{
+  "name": "volume-number",
+  "title": "Volume Number",
+  "summary": "Test patch: the volume as a number.",
+  "symbol": "speaker.wave.2",
+  "category": "test",
+  "version_letter": "e",
+  "version": "0.11",
+  "size": 24,
+  "description": "The volume bar of Now Playing shows the volume as a white number from 0 to 100, in the middle of the bar.",
+  "details": [
+    "The firmware of the iPod has a text for the volume. Apple hid it behind a switch file. This patch turns the switch on in the code, so no file is necessary.",
+    "The number is the volume from 0 to 100 (the output volume of the iPod x 100 / 256). It changes while you turn the wheel.",
+    "The number is white, in Podium Sans 16, bold, in the middle of the bar. The patch adds one text element at the end of the element list of the volume bar.",
+    "The colour of a text comes from its Type record when the flag byte + 92 is 0x0c. Type 24227 (Podium Sans 16, bold, centred) is black in Apple's firmware, and no stock View uses it. This patch makes its colour white."
+  ],
+  "notes": [
+    "This is a test version. White is easy to read on the blue part of the bar. On the light grey part (a low volume), it is not as easy to read.",
+    "The patch puts a new copy of View 24544 in the free space of the firmware, with the new element. With Switch on iPod and a dark theme, the copy does not switch with the other Views, so the number is white in each look.",
+    "With the Apple limit of the volume of the EU (no volume-unlimit patch), the highest volume shows as 84."
+  ],
+  "osos_sha256": "784ae3d5540fd2f89e8c947b93629e97f62a06dc311d9745aab143e4db6bb251",
+  "targets": [
+    {
+      "model": "iPod Video (5G/5.5G)",
+      "firmware": "1.3",
+      "osos_sha256": "784ae3d5540fd2f89e8c947b93629e97f62a06dc311d9745aab143e4db6bb251"
+    }
+  ],
+  "bytes": [
+    {
+      "at": "0x1e8a24",
+      "expect": "0000d2e5",
+      "value": "0100a0e3"
+    },
+    {
+      "at": "0x4cb014",
+      "expect": "000000",
+      "value": "ffffff"
+    }
+  ],
+  "view_elements": [
+    {
+      "view_id": 24544,
+      "after": 4,
+      "element": "5c0000008015000020727453ef6300008063000000000000000a00010000000002000080110000000000000002000080830000000000000008000080120000000000000004000080320000002864d0ff5898e8ff0000a35e000000000c000000"
+    }
+  ],
+  "load_address": "extended",
+  "symbols": {},
+  "hooks": [
+    {
+      "kind": "bl",
+      "at": "0x1e8a30",
+      "expect": "0xe595240c",
+      "to": "hook_volume_level"
+    }
+  ]
+}

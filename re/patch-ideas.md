@@ -89,7 +89,7 @@ The ideas in this section have no firmware research, except where a line gives a
 | Split home screen | High | Low to medium | The Firebird themes do this on firmware 1.3 with resource edits. The list uses the left 2/3. The right 1/3 shows the cover, the song, the album and the artist. A mini player below the list is the fallback. Refer to [home-screen.md](home-screen.md). |
 | No automatic Now Playing | Medium | Not known | Future change, requested by the owner. Now Playing opens only when the owner presses Play on a song or selects the Now Playing menu item. It must not open by itself. Refer to [home-screen.md](home-screen.md#automatic-now-playing). |
 | Battery display options | Medium | Low to medium | Icon, Icon + Percent, Percent. Research: [battery.md](battery.md). The firmware has a hidden number display. |
-| Numeric volume | Medium | Low | The firmware has the switch `_show_numeric_volume`. Refer to [device-switches.md](device-switches.md). |
+| Numeric volume | Medium | Low | Done as the test patch `volume-number`: 1 instruction. Refer to [numeric-volume.md](numeric-volume.md). |
 | Main menu order | High | Low | The app reorders the items of Menu 24094. Check the effect on the mask at 0x105a04. PodBox also has this. |
 | Compact lists | Medium | Low | Shows more rows. The width test of the split home screen also tells if this is possible. |
 | Large cover in Now Playing | High | Medium | A key shows the 200 × 200 cover on a full screen. |
@@ -122,6 +122,53 @@ PodBox and Rockpod use GPL-2.0. Use only the ideas. Do not copy their code.
 | Fonts and resources from files | RepriseOS wishlist | Medium | Not known. It can help the CJK fonts. | High | Find the font load path. |
 
 Not useful for this project: Bluetooth (no source found), 192 kHz audio (the output is 44.1 kHz, 16 bits), Music Quiz, games, and the image and text viewers. `search-5g` already gives the Search screen.
+
+## Ideas from the review of 3 November 2026
+
+This section lists ideas that cost little CPU and little RAM. The ideas have no firmware research, except where a line gives a note. The values are estimates.
+
+### The CPU budget
+
+The PP5022 has two ARM cores at 80 MHz. A feature is cheap if it does not work on each audio sample. The app can also do the heavy work on the Mac, and the iPod then only reads the result. The patches `album-art` and `custom-eq` already work in this way.
+
+| Cost | Examples | Decision |
+|---|---|---|
+| None | Menu items, list order, settings, constants, rows in iTunesDB | Build. |
+| Low | Reading track fields, writing a log, drawing text | Build. |
+| Medium | A new codec. Rockbox reports about 10 to 13 MHz of one core for FLAC at 44.1 kHz and 16 bits. This is an old figure. | Possible. The work is large. |
+| High | Crossfade, time-stretch, crossfeed, compressor | Do not build. The software EQ already uses part of the budget. |
+
+Rockbox turned off AAC-HE on the PP5002 to PP5022 chips, because they cannot decode it.
+
+### New ideas
+
+| Idea | Value | Work | Note |
+|---|---|---|---|
+| Sound Check at import | Medium | Low | The track object has a Sound Check field (+0x7e, refer to [song-info.md](song-info.md)). The app measures the loudness on the Mac and writes the value. The iPod does no extra work. |
+| Headphone EQ profiles | High | Medium | The app converts a parametric profile (for example AutoEq) to the 5 biquads of `custom-eq`. Apple presets already use up to 5 biquads, so the CPU load does not change. |
+| Automatic playlists at sync | High | Low to medium | The app makes Recently Added, Never Played, Forgotten Albums and Most Played. The iPod needs no new list order. The play counts update at the next sync. |
+| Preflight check of the track limit | High for 32 MB iPods | Medium | The app estimates the database RAM before a sync. It warns before the Apple logo loop. Refer to [ram-limit.md](ram-limit.md). |
+| Remember position and Skip When Shuffling | Medium | Low | The app sets the flags at import for podcasts, audiobooks and long mixes. The track object has a bookmark time (+0x64). Test if the firmware obeys the flag for music files. |
+| Sleep timer with fade-out | Medium | Low to medium | Lower the volume in the last 30 seconds, then run `sleep-now`. This changes a volume value, not the audio data. |
+| Tunable constants | Medium | Low | The hold time of Select, the scrub speed, the wheel acceleration and the backlight time during playback. These are data patches like `backlight-60s`. |
+| Database headroom in About | Medium | Low | Show the track count against the RAM limit. This extends the idea "Patch list in Settings > About". |
+| Wheel wake guard | Low | Low | Wake the iPod only with Select or Play. `flash-wake-on-input` already ignores the wheel for the storage. |
+| Volume for each output | Low to medium | Medium | Remember the volume for the headphones, USB-C and the speaker. It helps `usb-audio-out`. |
+| Dark Mode on a schedule | Low | Low | Switch at set times. `dark-mode` has the switch. |
+| Calendar, Contacts and Notes from the Mac | Low to medium | Low | `date-time.md` lists calendar views in the firmware. Test if firmware 1.3 reads files that the app writes. |
+
+### Order of work
+
+1. Sound Check at import, headphone EQ profiles and automatic playlists. These need no firmware change.
+2. The preflight check of the track limit.
+3. Play Next, Song Info, the scrobble log and the battery display from the list above.
+4. The small patches: sleep fade, constants and the About headroom.
+
+Do not build crossfade, time-stretch, crossfeed or the compressor. For FLAC, the conversion to ALAC at import is much cheaper than a decoder.
+
+Limits of the search: the web search gave few hard numbers. The CPU figures come from Rockbox commit messages and old forum posts. The clock modes of the PP5022 and the battery life are not confirmed.
+
+Sources: [iPodWiki iPod Video](https://ipodwiki.com/wiki/IPod_Video), [PodBox](https://github.com/anthonyfletcher/podbox), [osos-lab wishlist](https://raw.githubusercontent.com/lgreitis/osos-lab/main/PATCH-WISHLIST.md), [Rockbox MP3 on the coprocessor](https://git.lenord.me/devs/foxbox/commit/07405841c67ac29b2a75f20f8732b34064a28cff), [Rockbox FLAC speed](https://git.lenord.me/devs/foxbox/commit/fe23dc8f15e9d01ea634d10b334984f1d8760007).
 
 Limits of the search: the Rockbox plugin index, the Foxbox page and one Reddit copy did not open. The Rockbox facts come from copies of the manual, not from the current manual.
 

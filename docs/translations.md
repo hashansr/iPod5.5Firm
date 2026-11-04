@@ -58,6 +58,7 @@ The language key is the value of the iPod setting. A patch uses it to select the
 | Patch | English text | Where the iPod shows the text |
 |---|---|---|
 | `dark-mode` | Dark Mode | The name of an item in Settings. The value is On or Off. |
+| `wheel-guard` | Wheel Guard | The name of an item in Settings. The value is On or Off. The wheel does nothing after the screen light goes off, until a button is pushed. |
 | `album-artists` | Album Artists | An item in the Music menu and in the main menu. Also the title of the screen. Also a row in Settings > Main Menu. |
 | `custom-eq` | Custom | The name of the first EQ. The user can change the name in the app. An item of Settings > EQ. |
 | `shuffle-album-mix` | Album Mix | A value of Settings > Shuffle, after Off, Songs and Albums. The albums play in a random sequence, and the songs in each album also play in a random sequence. The main menu item "Shuffle: Album Mix" also shows it. The other texts of that item ("Shuffle", Off, Songs, Albums) are Apple strings, and the iPod shows them in its language. |
@@ -79,6 +80,7 @@ Copy this block. Write your text after each `=`. Leave a line empty if you do no
 Language:
 
 Dark Mode =
+Wheel Guard =
 Album Artists =
 Custom =
 Album Mix =
@@ -125,28 +127,28 @@ To see all Apple strings of a language, use the Strings pane of the iPodFirm app
 
 "Needed" means that nobody has sent a translation. "Received" means that a translation is in this document, but the patch does not use it yet. "Done" means that the iPod shows the translation.
 
-| Language | `dark-mode` | `album-artists` | `shuffle-album-mix` | `something-comforting` | `usb-audio-out` | `backlight-60s` |
-|---|---|---|---|---|---|---|
-| Czech | Needed | Needed | Needed | Needed | Needed | Done |
-| Danish | Needed | Needed | Needed | Needed | Needed | Done |
-| German | Needed | Needed | Needed | Needed | Needed | Done |
-| Greek | Needed | Needed | Needed | Needed | Needed | Done |
-| Spanish | Needed | Needed | Needed | Needed | Needed | Done |
-| Finnish | Needed | Needed | Needed | Needed | Needed | Done |
-| French | Needed | Needed | Needed | Needed | Needed | Done |
-| Hungarian | Needed | Needed | Needed | Needed | Needed | Done |
-| Italian | Needed | Needed | Needed | Needed | Needed | Done |
-| Japanese | Needed | Needed | Needed | Needed | Needed | Done |
-| Korean | Needed | Needed | Needed | Needed | Needed | Done |
-| Dutch | Needed | Needed | Needed | Needed | Needed | Done |
-| Norwegian | Needed | Needed | Needed | Needed | Needed | Done |
-| Polish | Needed | Needed | Needed | Needed | Needed | Done |
-| Portuguese | Needed | Needed | Needed | Needed | Needed | Done |
-| Russian | Needed | Needed | Needed | Needed | Needed | Done |
-| Swedish | Needed | Needed | Needed | Needed | Needed | Done |
-| Turkish | Needed | Needed | Needed | Needed | Needed | Done |
-| Chinese (Simplified) | Needed | Needed | Needed | Needed | Needed | Done |
-| Chinese (Traditional) | Needed | Needed | Needed | Needed | Needed | Done |
+| Language | `dark-mode` | `album-artists` | `shuffle-album-mix` | `something-comforting` | `usb-audio-out` | `backlight-60s` | `wheel-guard` |
+|---|---|---|---|---|---|---|---|
+| Czech | Needed | Needed | Needed | Needed | Needed | Done | Needed |
+| Danish | Needed | Needed | Needed | Needed | Needed | Done | Needed |
+| German | Needed | Needed | Needed | Needed | Needed | Done | Needed |
+| Greek | Needed | Needed | Needed | Needed | Needed | Done | Needed |
+| Spanish | Needed | Needed | Needed | Needed | Needed | Done | Needed |
+| Finnish | Needed | Needed | Needed | Needed | Needed | Done | Needed |
+| French | Needed | Needed | Needed | Needed | Needed | Done | Needed |
+| Hungarian | Needed | Needed | Needed | Needed | Needed | Done | Needed |
+| Italian | Needed | Needed | Needed | Needed | Needed | Done | Needed |
+| Japanese | Needed | Needed | Needed | Needed | Needed | Done | Needed |
+| Korean | Needed | Needed | Needed | Needed | Needed | Done | Needed |
+| Dutch | Needed | Needed | Needed | Needed | Needed | Done | Needed |
+| Norwegian | Needed | Needed | Needed | Needed | Needed | Done | Needed |
+| Polish | Needed | Needed | Needed | Needed | Needed | Done | Needed |
+| Portuguese | Needed | Needed | Needed | Needed | Needed | Done | Needed |
+| Russian | Needed | Needed | Needed | Needed | Needed | Done | Needed |
+| Swedish | Needed | Needed | Needed | Needed | Needed | Done | Needed |
+| Turkish | Needed | Needed | Needed | Needed | Needed | Done | Needed |
+| Chinese (Simplified) | Needed | Needed | Needed | Needed | Needed | Done | Needed |
+| Chinese (Traditional) | Needed | Needed | Needed | Needed | Needed | Done | Needed |
 
 ## Received translations
 

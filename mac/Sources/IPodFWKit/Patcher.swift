@@ -80,7 +80,12 @@ public struct PatchSpec: Codable, Identifiable, Hashable {
     /// A data change: `expect` and `value` are hexadecimal bytes.
     public struct Bytes: Codable, Hashable {
         public var at, expect, value: String
-        public init(at: String, expect: String, value: String) { self.at = at; self.expect = expect; self.value = value }
+        /// Other bytes that the firmware can have here, for example after a dark theme. The patch then writes `value`
+        /// in the same way. Each entry has the same length as `expect`.
+        public var also_expect: [String]?
+        public init(at: String, expect: String, value: String, also_expect: [String]? = nil) {
+            self.at = at; self.expect = expect; self.value = value; self.also_expect = also_expect
+        }
     }
     /// A firmware build that the patch is for: the iPod model and the firmware version, for display.
     /// `osos_sha256` must be the same as the `osos_sha256` of the patch. The hash is the real check.
@@ -111,6 +116,17 @@ public struct PatchSpec: Codable, Identifiable, Hashable {
     public var settings_items: [SettingsItem]?
     /// Copies of items that the patch adds to other menus.
     public var menu_items: [MenuItem]?
+    /// Elements that the patch adds to Views (see ViewElement).
+    public var view_elements: [ViewElement]?
+    public struct ViewElement: Codable, Hashable {
+        /// The ID of the View (a `View` resource of the main block).
+        public var view_id: Int
+        /// The new element goes after the element with this index (0 is the first element). An element
+        /// that refers to "the previous element" then refers to the element with this index.
+        public var after: Int
+        /// The bytes of the element in hexadecimal. The first 32-bit word is the size of the element minus 4.
+        public var element: String
+    }
     /// Choices that the owner makes in the Patches pane (see Option).
     public var options: [Option]?
     /// The patch has the EQ editor of the Patches pane. The band values are in `PatchInfo.options`.
@@ -118,6 +134,12 @@ public struct PatchSpec: Codable, Identifiable, Hashable {
     public struct EQEditor: Codable, Hashable {
         /// The variable with the filter records and the variable with the list of EQs.
         public var records, list: String
+    }
+    /// The patch takes a `BatteryCurve` from `PatchInfo.batteryCurve`.
+    public var battery_curve: BatteryCurveVariables?
+    public struct BatteryCurveVariables: Codable, Hashable {
+        /// The variables with the raw values and the percentages (each 16 values of 16 bits).
+        public var raw, percent: String
     }
     /// A warning for an iPod that probably has the original hard drive (see IPodDisk.likelyOriginalHDD).
     public var hdd_warning: String?
@@ -166,7 +188,7 @@ public struct PatchSpec: Codable, Identifiable, Hashable {
         patches.filter { $0.spec.internal != true && (showTests || !$0.spec.isTest) }
     }
     /// The ids of the built-in Swift tools that `ui.tools` can name (PatchTools.swift in the app).
-    public static let knownTools = ["album-thumbnails"]
+    public static let knownTools = ["album-thumbnails", "battery-curve"]
     public var displayTitle: String { title ?? name }
     /// The version, or nil if `version` is missing or not valid.
     public var parsedVersion: PatchVersion? { version.flatMap(PatchVersion.init) }
@@ -311,6 +333,8 @@ public struct PatchInfo: Identifiable, Hashable {
     public var options: [String: Int] = [:]
     /// The EQs of a patch with `eq_editor`. If the list is empty, the options give one EQ "Custom".
     public var customEQs: [NamedEQ] = []
+    /// The curve of a patch with `battery_curve`. Without a curve, the patch uses its own values.
+    public var batteryCurve: BatteryCurve?
     public init(spec: PatchSpec, folder: URL, source: Source = .builtIn) {
         self.spec = spec
         self.folder = folder
@@ -418,6 +442,15 @@ public enum Patcher {
             var ids = [Int]()
             for m in p.spec.menu_items ?? [] where !ids.contains(m.menu_id) { ids.append(m.menu_id) }
             for id in ids { addMenu(Int16(id), (p.spec.menu_items ?? []).filter { $0.menu_id == id }.count) }
+            var views = [Int]()
+            for v in p.spec.view_elements ?? [] where !views.contains(v.view_id) { views.append(v.view_id) }
+            for id in views {
+                let added = (p.spec.view_elements ?? []).filter { $0.view_id == id }.reduce(0) { $0 + ((try? hexBytes($1.element).count) ?? 0) }
+                if let main = try? Resources.mainBlock(Resources.scan(osos, limit: maxOSOSSize)),
+                   let r = main.resources.first(where: { $0.type == "View" && Int($0.id) == id }) {
+                    count = (max(count, maxOSOSSize) + 15) & ~15 + Int(r.size) + added
+                }
+            }
         }
         if listSize > 0, count > maxOSOSSize {
             let before = count
@@ -478,6 +511,10 @@ public enum Patcher {
             }
             for b in p.spec.bytes ?? [] {
                 if let v = try? hex(b.at) { r.append((Int(v)..<Int(v) + max(1, b.expect.count / 2), "bytes at \(b.at)")) }
+            }
+            for item in p.spec.view_elements ?? [] {
+                let k = (1 << 34) + item.view_id << 8 + item.after
+                r.append((k..<k + 1, "View \(item.view_id) element \(item.after)"))
             }
             return r
         }
@@ -578,7 +615,7 @@ public enum Patcher {
                 for h in chained { fw[h.chain!] = try chainTarget(h, in: current, patchSymbols: first) }
             }
             (code, table) = try link(object, base: base, firmware: fw)
-            try setOptions(spec, values: patch.options, eqs: patch.customEQs, in: &code, base: base, symbols: table)
+            try setOptions(spec, values: patch.options, eqs: patch.customEQs, curve: patch.batteryCurve, in: &code, base: base, symbols: table)
         }
         let end = Int(base) + code.count
         guard end <= maxSize else {
@@ -612,11 +649,12 @@ public enum Patcher {
         try applyData(spec, to: &out)
         if let items = spec.settings_items, !items.isEmpty { try addSettingsItems(items, to: &out) }
         if let items = spec.menu_items, !items.isEmpty { try addMenuItems(items, to: &out) }
+        if let items = spec.view_elements, !items.isEmpty { try addViewElements(items, to: &out) }
         return pad ? padded(out) : out
     }
 
     /// Write the selected value of each option into its variable in the linked code.
-    static func setOptions(_ spec: PatchSpec, values: [String: Int], eqs: [NamedEQ] = [], in code: inout [UInt8], base: UInt32,
+    static func setOptions(_ spec: PatchSpec, values: [String: Int], eqs: [NamedEQ] = [], curve: BatteryCurve? = nil, in code: inout [UInt8], base: UInt32,
                            symbols: [String: UInt32]) throws {
         for o in spec.options ?? [] {
             let value = values[o.id] ?? o.defaultValue
@@ -633,6 +671,14 @@ public enum Patcher {
             for (symbol, data) in [(editor.records, library.records), (editor.list, library.list)] {
                 guard let a = symbols[symbol], a >= base, Int(a - base) + data.count <= code.count else {
                     throw PatchError("eq_editor of \"\(spec.displayTitle)\": \(symbol) is not in the patch.")
+                }
+                code.replaceSubrange(Int(a - base)..<Int(a - base) + data.count, with: data)
+            }
+        }
+        if let variables = spec.battery_curve, let curve {
+            for (symbol, data) in [(variables.raw, curve.bytes.raw), (variables.percent, curve.bytes.percent)] {
+                guard let a = symbols[symbol], a >= base, Int(a - base) + data.count <= code.count, a & 1 == 0 else {
+                    throw PatchError("battery_curve of \"\(spec.displayTitle)\": \(symbol) is not in the patch.")
                 }
                 code.replaceSubrange(Int(a - base)..<Int(a - base) + data.count, with: data)
             }
@@ -761,6 +807,58 @@ public enum Patcher {
         }
     }
 
+    /// The elements of a View: the start and the size of each element after the header (the count of
+    /// elements, 4 bytes). Throws if the data is not a View.
+    static func viewElementRanges(_ view: [UInt8]) throws -> [(start: Int, size: Int)] {
+        guard view.count >= 4 else { throw PatchError("The View is too short.") }
+        var ranges: [(start: Int, size: Int)] = []
+        var at = 4
+        while at + 16 <= view.count {
+            let size = Int(le32(view, at)) + 4
+            guard size >= 16, at + size <= view.count else { throw PatchError("The View has a bad element at \(at).") }
+            ranges.append((at, size))
+            at += size
+        }
+        guard at == view.count, Int(le32(view, 0)) == ranges.count else { throw PatchError("The View is not complete.") }
+        return ranges
+    }
+
+    /// Add the elements to their Views. Each changed View goes after the end of `out` (as `addMenuItems`
+    /// does for a menu), and its resource table entry then points to it. The header gets the new count.
+    static func addViewElements(_ items: [PatchSpec.ViewElement], to out: inout [UInt8]) throws {
+        var ids = [Int]()
+        for item in items where !ids.contains(item.view_id) { ids.append(item.view_id) }
+        for id in ids {
+            let main = try Resources.mainBlock(Resources.scan(out, limit: maxOSOSSize))
+            guard let res = main.resources.first(where: { $0.type == "View" && Int($0.id) == id }) else {
+                throw PatchError("The firmware has no View \(id).")
+            }
+            let at = main.abs(res)
+            guard at + Int(res.size) <= out.count else { throw PatchError("View \(id) is outside the image.") }
+            var view = Array(out[at..<at + Int(res.size)])
+            for item in items where item.view_id == id {
+                let element = try hexBytes(item.element)
+                guard element.count >= 16, Int(le32(element, 0)) + 4 == element.count else {
+                    throw PatchError("The element for View \(id) has a wrong size.")
+                }
+                let ranges = try viewElementRanges(view)
+                guard item.after >= 0, item.after < ranges.count else {
+                    throw PatchError("View \(id) has no element \(item.after).")
+                }
+                let end = ranges[item.after].start + ranges[item.after].size
+                view.insert(contentsOf: element, at: end)
+                put32(&view, 0, UInt32(ranges.count + 1))
+            }
+            let viewAt = Int(extendedBase(out))
+            let size = viewAt + view.count
+            guard size <= ThemeImport.ososLimit else { throw PatchError("No space for View \(id).") }
+            out += [UInt8](repeating: 0, count: size - out.count)
+            out.replaceSubrange(viewAt..<viewAt + view.count, with: view)
+            put32(&out, res.tablePos + 4, UInt32(viewAt - main.dataStart))
+            put32(&out, res.tablePos + 8, UInt32(view.count))
+        }
+    }
+
     static func hasCode(_ folder: URL) -> Bool {
         let files = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
         return files.contains { $0.pathExtension == "c" || $0.lastPathComponent == objectFile }
@@ -779,15 +877,7 @@ public enum Patcher {
 
     /// Apply the "bytes" and "strings" sections of a patch.
     static func applyData(_ spec: PatchSpec, to out: inout [UInt8]) throws {
-        for e in spec.bytes ?? [] {
-            let at = Int(try hex(e.at))
-            let expect = try hexBytes(e.expect), value = try hexBytes(e.value)
-            guard expect.count == value.count else { throw PatchError("Bytes at \(e.at): \"expect\" and \"value\" have different lengths.") }
-            guard at + expect.count <= out.count, Array(out[at..<at + expect.count]) == expect else {
-                throw PatchError("Bytes at \(e.at): the firmware does not have \(e.expect).")
-            }
-            out.replaceSubrange(at..<at + value.count, with: value)
-        }
+        try applyBytes(spec, to: &out)
         guard let strings = spec.strings, !strings.isEmpty else { return }
         var blocks = Resources.scan(out)
         for (key, values) in strings {
@@ -797,6 +887,20 @@ public enum Patcher {
             do { try Resources.writeStrings(&out, &blocks[i], values) } catch {
                 throw PatchError("Strings for block \(key): \(error.localizedDescription)")
             }
+        }
+    }
+
+    /// Apply only the "bytes" section of a patch.
+    static func applyBytes(_ spec: PatchSpec, to out: inout [UInt8]) throws {
+        for e in spec.bytes ?? [] {
+            let at = Int(try hex(e.at))
+            let expect = try hexBytes(e.expect), value = try hexBytes(e.value)
+            guard expect.count == value.count else { throw PatchError("Bytes at \(e.at): \"expect\" and \"value\" have different lengths.") }
+            let accepted = try [expect] + (e.also_expect ?? []).map(hexBytes)
+            guard at + expect.count <= out.count, accepted.contains(Array(out[at..<at + expect.count])) else {
+                throw PatchError("Bytes at \(e.at): the firmware does not have \(e.expect).")
+            }
+            out.replaceSubrange(at..<at + value.count, with: value)
         }
     }
 

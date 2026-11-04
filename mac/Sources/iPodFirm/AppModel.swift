@@ -90,6 +90,15 @@ final class AppModel: ObservableObject {
         }
     }
     @Published var selectedEQName = ""
+    /// The curve from a battery log for the patch battery-display (nil: the curve of the patch).
+    @Published var batteryCurve: BatteryCurve? = {
+        UserDefaults.standard.data(forKey: "batteryCurve").flatMap { try? JSONDecoder().decode(BatteryCurve.self, from: $0) }
+    }() {
+        didSet {
+            UserDefaults.standard.set(batteryCurve.flatMap { try? JSONEncoder().encode($0) }, forKey: "batteryCurve")
+            switchesChanged(oldValue != batteryCurve)
+        }
+    }
 
     static func loadEQs() -> [NamedEQ] {
         let d = UserDefaults.standard
@@ -1133,6 +1142,7 @@ final class AppModel: ObservableObject {
             var p = p
             p.options = patchOptions[p.spec.name] ?? [:]
             if p.spec.eq_editor != nil { p.customEQs = customEQs }
+            if p.spec.battery_curve != nil { p.batteryCurve = batteryCurve }
             return p
         }
     }
@@ -1301,7 +1311,8 @@ final class AppModel: ObservableObject {
         case .switchOnIPod(let theme, let patch, let layout):
             AppLog.step("Build: add Dark Mode with the theme \(theme.name) and the patch \(patch.spec.name) \(patch.spec.versionText)")
             osos = try DarkMode.build(partition: editor.partition, osos: osos, theme: theme, patch: patch,
-                                      originalSHA256: editor.originalOSOSHash, layout: layout).0
+                                      originalSHA256: editor.originalOSOSHash, layout: layout,
+                                      patches: patches.map(\.spec)).0
         case nil:
             break
         }
@@ -1491,6 +1502,27 @@ final class AppModel: ObservableObject {
             thumbnailStatus = "\(r.covers) of \(r.albums) albums and \(r.playlistArt) of \(r.playlists) playlists have a thumbnail (\(Date().formatted(date: .abbreviated, time: .shortened)))."
             playlistArtChanged = false
         } catch { fail("Cannot Write the Thumbnails", error) }
+    }
+
+    /// Makes the battery curve from a saved battery log.
+    func chooseBatteryLogFile() {
+        let p = NSOpenPanel()
+        p.allowedContentTypes = [.plainText, .data]
+        p.message = "Choose a battery log from a full charge until the iPod stopped."
+        guard p.runModal() == .OK, let url = p.url else { return }
+        do {
+            importBatteryCurve(String(decoding: try Data(contentsOf: url).prefix { $0 != 0 }, as: UTF8.self))
+        } catch {
+            fail("Cannot Read the Battery Log", error)
+        }
+    }
+
+    private func importBatteryCurve(_ log: String) {
+        do {
+            batteryCurve = try BatteryCurve.make(log: log)
+        } catch {
+            alert = AlertInfo(title: "Cannot Use the Battery Log", message: error.localizedDescription)
+        }
     }
 
     /// Read the playlists of the connected iPod and their images.

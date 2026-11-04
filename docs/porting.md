@@ -41,10 +41,12 @@ Thus, about 12,600 lines of the app are in Swift. The UI and the helper (about 6
 | `Device.swift`, `Operations.swift` | `device.py`, `cli.py` (`devices`, `backup`, `flash`, `restore`) |
 | `FirmwareVersion.swift` | None |
 | `FirmwareManifest.swift` (the iPodFirm list and `Patcher.detect`) | None. The Python patcher does not write the list. |
+| `Patcher.addViewElements` (the key `view_elements`) | None. The Python patcher ignores the key, so a build with `volume-number` has no text on the volume bar. |
 | `PatchLibrary.swift` (install and export of a `.ipodpatch` file) | None |
 | `PatchCode.swift` (the code of a user patch for the patch editor) | None |
 | `USBProbeLog.swift` | None |
 | `PlaybackLog.swift` | None |
+| `BatteryCurve.swift` (a curve from a battery log) | None. The Python build uses the curve in `battery_display.c`. |
 | `CustomEQ.swift` (the coefficients of `custom-eq`) | `custom_eq.py`. `SharedEQ` (the `.ipodeq` file) and `applePresets` have no Python version. |
 | `PlaylistFolders.swift` (the folder file of `playlist-folders`) | None. `re/playlist-folders/harness/folders.py` writes the same file for the emulator tests. |
 | `HelperXPC.swift` | None. The Python tool runs with `sudo`. |

@@ -588,6 +588,100 @@ final class PatchAndArtTests: XCTestCase {
         _ = try Patcher.apply(all.filter { ["album-art", "sleep-now", "flash-keep-awake", "flash-wake-on-input"].contains($0.spec.name) }, to: osos)
     }
 
+    /// The wheel-guard patch: the slot of the UI event handler (0x6701f0) points to the hook. With cover-flow,
+    /// which uses the same slot, the guard chains to the hook of cover-flow.
+    func testWheelGuardChainsToCoverFlow() throws {
+        guard let ipsw = ProcessInfo.processInfo.environment["IPODFW_IPSW"] else { throw XCTSkip("set IPODFW_IPSW") }
+        let osos = try FirmwarePartition(data: IPSW.extractFirmware(URL(fileURLWithPath: ipsw)).data).image("osos")
+        let all = Patcher.list(in: Self.repo.appendingPathComponent("patches"))
+        XCTAssertEqual(all.filter { $0.spec.name == "wheel-guard" }.count, 1)
+        let alone = try Patcher.apply(all.filter { $0.spec.name == "wheel-guard" }, to: osos)
+        XCTAssertEqual(le32(osos, 0x6701f0), 0x001d_81cc)
+        XCTAssertGreaterThanOrEqual(Int(le32(alone, 0x6701f0)), 0x7358d0)    // the hook is in the patch area
+        let flow = try Patcher.apply(all.filter { $0.spec.name == "cover-flow" }, to: osos)
+        let both = try Patcher.apply(all.filter { ["cover-flow", "wheel-guard"].contains($0.spec.name) }, to: osos)
+        XCTAssertNotEqual(le32(both, 0x6701f0), le32(flow, 0x6701f0))        // the guard is first, and cover-flow follows
+        XCTAssertGreaterThanOrEqual(Int(le32(both, 0x6701f0)), 0x7358d0)
+    }
+
+    /// The wheel-guard Settings item: the Settings menu has the key 0x60007e20 after Clicker, together with the item of
+    /// up-next, and the three hooks of the settings object chain to the hooks of up-next.
+    func testWheelGuardSettingsItem() throws {
+        guard let ipsw = ProcessInfo.processInfo.environment["IPODFW_IPSW"] else { throw XCTSkip("set IPODFW_IPSW") }
+        let osos = try FirmwarePartition(data: IPSW.extractFirmware(URL(fileURLWithPath: ipsw)).data).image("osos")
+        let all = Patcher.list(in: Self.repo.appendingPathComponent("patches"))
+        let out = try Patcher.apply(all.filter { ["up-next", "wheel-guard"].contains($0.spec.name) }, to: osos)
+        let main = try Resources.mainBlock(Resources.scan(out, limit: Patcher.maxOSOSSize))
+        let menu = try XCTUnwrap(main.resources.first { $0.type == "Menu" && $0.id == Patcher.settingsMenuID })
+        let at = main.abs(menu)
+        let count = Int(le32(out, at))
+        let keys = (0..<count).map { le32(out, at + 4 + 40 * $0 + 0x1C) }
+        XCTAssertTrue(keys.contains(0x6000_7e20))
+        XCTAssertTrue(keys.contains(0x6000_7e0f))
+        let clicker = try XCTUnwrap(keys.firstIndex(of: 0x6000_6088))
+        XCTAssertTrue(keys[(clicker + 1)...].contains(0x6000_7e20))
+        for slot in [0x66c94c, 0x66c950] {                                    // the get and the set methods
+            XCTAssertGreaterThanOrEqual(Int(le32(out, slot)), 0x7358d0)
+        }
+        XCTAssertEqual(le32(out, 0x21f254) & 0xFF00_0000, 0xEA00_0000)       // the lookup is a branch to the hook
+    }
+
+    /// The volume-number patch: 2 changed tests of the switch byte, 2 hooks for the number, and a new copy of View 24544 with a text element
+    /// (ID 0x63ef) after the slider. The table entry points to the copy. The old View stays.
+    func testVolumeNumberAddsTheText() throws {
+        guard let ipsw = ProcessInfo.processInfo.environment["IPODFW_IPSW"] else { throw XCTSkip("set IPODFW_IPSW") }
+        let osos = try FirmwarePartition(data: IPSW.extractFirmware(URL(fileURLWithPath: ipsw)).data).image("osos")
+        let all = Patcher.list(in: Self.repo.appendingPathComponent("patches"))
+        let patch = all.filter { $0.spec.name == "volume-number" }
+        XCTAssertEqual(patch.count, 1)
+        let out = try Patcher.apply(patch, to: osos)
+        XCTAssertEqual(le32(out, 0x1e89e0), le32(osos, 0x1e89e0))   // the text of the ID 0x63f1 stays off
+        XCTAssertEqual(Array(out[0x4cb014..<0x4cb018]), [0xff, 0xff, 0xff, 0xff])   // the colour of Type 24227 is white
+        XCTAssertEqual(le32(osos, 0x1e8a24), 0xe5d2_0000)      // ldrb r0, [r2]
+        XCTAssertEqual(le32(out, 0x1e8a24), 0xe3a0_0001)       // the text of the ID 0x63ef is on
+        XCTAssertEqual(le32(osos, 0x1e8a30), 0xe595_240c)       // ldr r2, [r5, #0x40c]
+        XCTAssertEqual(le32(out, 0x1e8a30) & 0xFF00_0000, 0xEB00_0000)   // the load goes to the hook (bl)
+        XCTAssertEqual(le32(out, 0x1e89e8), le32(osos, 0x1e89e8))
+        let blocks = Resources.scan(out, limit: Patcher.maxOSOSSize)
+        let main = try Resources.mainBlock(blocks)
+        let oldMain = try Resources.mainBlock(Resources.scan(osos, limit: Patcher.maxOSOSSize))
+        let old = try XCTUnwrap(oldMain.resources.first { $0.type == "View" && $0.id == 24544 })
+        let new = try XCTUnwrap(main.resources.first { $0.type == "View" && $0.id == 24544 })
+        XCTAssertEqual(Int(new.size), Int(old.size) + 96)
+        XCTAssertGreaterThanOrEqual(main.abs(new), Patcher.maxOSOSSize)         // the copy is after the end of the old image
+        let view = Array(out[main.abs(new)..<main.abs(new) + Int(new.size)])
+        let ranges = try Patcher.viewElementRanges(view)
+        XCTAssertEqual(ranges.count, 6)
+        XCTAssertEqual(le32(view, 0), 6)
+        // elements: BMap, BMap, Cntl, BMap, BMap, the new Str element at the end (the old elements keep their places)
+        XCTAssertEqual(String(decoding: view[ranges[2].start + 8..<ranges[2].start + 12], as: UTF8.self), "ltnC")
+        var probes: [[UInt32]] = []
+        for r in ranges[5..<6] {
+            XCTAssertEqual(String(decoding: view[r.start + 8..<r.start + 12], as: UTF8.self), " rtS")
+            XCTAssertEqual(le32(view, r.start + 24) >> 24 & 1, 1)       // the text is centred up and down
+            probes.append([le32(view, r.start + 12), le32(view, r.start + 16), le32(view, r.start + 84) >> 16, le32(view, r.start + 92)])
+        }
+        // the ID of the text, the data group, the Type and the flag byte of each probe
+        XCTAssertEqual(Set(probes.map { $0.map(String.init).joined(separator: ",") }),
+                       ["25583,25472,24227,12"])           // ID 0x63ef, group 0x6380, Podium Sans 16 centred, flag 0x0c (white)
+        // the old data does not change
+        XCTAssertEqual(Array(out[oldMain.abs(old)..<oldMain.abs(old) + Int(old.size)]), Array(osos[oldMain.abs(old)..<oldMain.abs(old) + Int(old.size)]))
+    }
+
+    /// `also_expect` lets a patch overwrite a byte that a dark theme has already changed.
+    func testBytesAlsoExpect() throws {
+        var spec = try JSONDecoder().decode(PatchSpec.self, from: Data(#"{"name":"x","osos_sha256":"","bytes":[{"at":"0x2","expect":"00","also_expect":["0c"],"value":"00"}]}"#.utf8))
+        for before: UInt8 in [0, 0x0c] {
+            var out: [UInt8] = [1, 2, before, 3]
+            try Patcher.applyData(spec, to: &out)
+            XCTAssertEqual(out, [1, 2, 0, 3])
+        }
+        var other: [UInt8] = [1, 2, 7, 3]
+        XCTAssertThrowsError(try Patcher.applyData(spec, to: &other))
+        spec.bytes = [PatchSpec.Bytes(at: "0x2", expect: "00", value: "01")]
+        XCTAssertThrowsError(try Patcher.applyData(spec, to: &other))
+    }
+
     /// The Storage Time option: the two flash patches have the same choices, and 30 minutes is the default.
     func testStorageTimeChoices() throws {
         let all = Patcher.list(in: Self.repo.appendingPathComponent("patches"))
@@ -1786,6 +1880,30 @@ final class DarkModeTests: XCTestCase {
         XCTAssertEqual((0..<4).map { le32(new, 4 + 40 * $0 + 0x1C) }, [0x6000_60B7, 0x6000_6088, DarkMode.darkKey, 0x6000_60AD])
         XCTAssertEqual(le32(new, 4 + 80 + 0x18), DarkMode.labelID)
         XCTAssertThrowsError(try DarkMode.settingsMenu(new))
+    }
+
+    /// The switch table must not write a byte that a patch changes, also if the patch writes Apple's value
+    /// (Battery Display: the flag byte + 92 of the text is 0, and Classic Dark makes it 0x0c).
+    func testSwitchTableKeepsPatchBytes() throws {
+        guard let ipsw = ProcessInfo.processInfo.environment["IPODFW_IPSW"] else { throw XCTSkip("set IPODFW_IPSW") }
+        let fw = try FirmwarePartition(data: IPSW.extractFirmware(URL(fileURLWithPath: ipsw)).data)
+        let osos = try fw.image("osos")
+        let sha = ThemeImport.sha256(osos)
+        let theme = try ImportedTheme.load(PatchAndArtTests.repo.appendingPathComponent("themes/Classic Dark.ipodtheme"))
+        let all = Patcher.list(in: PatchAndArtTests.repo.appendingPathComponent("patches"))
+        let dark = try XCTUnwrap(all.first { $0.spec.name == "dark-mode" })
+        let patches = all.filter { $0.spec.name == "battery-display" }
+        XCTAssertEqual(patches.count, 1)
+        for (use, flag) in [(false, UInt8(0x0c)), (true, UInt8(0))] {
+            let (built, info) = try DarkMode.build(partition: fw, osos: osos, theme: theme, patch: dark, originalSHA256: sha,
+                                                   patches: use ? patches.map { $0.spec } : [])
+            var out = try Patcher.apply(patches, to: built, originalSHA256: sha)
+            try DarkMode.applySwitchTable(&out, Array(out[info.table.at..<info.table.at + info.table.length]))
+            XCTAssertEqual(out[0x4e4b38], flag)             // the flag byte of the text in View 25598
+            XCTAssertEqual(out[0x4e5684], flag)             // and in View 25599
+            XCTAssertEqual(info.changesLeftOut, use ? 2 : 0)
+            XCTAssertEqual(le32(out, 0x4e4b30) >> 16, 24171)    // the Type of the text stays
+        }
     }
 
     /// The Swift build must give the same osos as `ipodfw apply-theme --switch` (IPODFW_SWITCH_EXPECT).
@@ -3042,8 +3160,8 @@ final class AccentTests: XCTestCase {
     static let grid = ["#ff3b30": "b9e9a7323dbba6053ddfd623d6d5ab143f325460b3bc39386e93d75816131921",
                        "#30d158": "279e551d6704051a7ebe7da93b90ccf419183cbb7e48f4f061b4996ceaeecbc6",
                        "#bf5af2": "e5e8ff4b5cc2b1d2dd1047c883010b2b137e3688c1f8032d08e5f09775e238d2"]
-    static let osos = ["#ff3b30": "c289f447b1368471620a258fb3316623b6f3ac7190e9ca7b7d439dbc813dbe6c",
-                       "#bf5af2": "d019d4a6eeaa2ebf96b062d62a1870634c8ac1d868eabd4296f27f054620ecab"]
+    static let osos = ["#ff3b30": "cabcb0d1dec55550ec7257d0354935f0bd09459834a756a7647ca7149047dde3",
+                       "#bf5af2": "3e42132052f359e70d4fb43e1fd35c401031d1bec3feffa2a292e617422f5924"]
 
     func testTheColourMustHaveTheFormRRGGBB() throws {
         for bad in ["", "red", "#12345", "#12345g", "1234567"] {
@@ -3112,6 +3230,124 @@ final class AccentTests: XCTestCase {
             XCTAssertEqual(r.conflicts, 0)
             XCTAssertEqual(r.applied, derived.effectiveChanges.count)
             XCTAssertEqual(ThemeImport.sha256(out), hash, colour)
+        }
+    }
+}
+
+/// The dark themes make the rays of the brightness suns (BMap 24286, 24287) gold. The rays are dark in Apple's firmware
+/// and do not show on the black background. An update of a built-in theme reaches the owner through `changes`.
+final class SunIconTests: XCTestCase {
+    func testDarkThemesColourTheRays() throws {
+        guard let path = ProcessInfo.processInfo.environment["IPODFW_IPSW"] else { throw XCTSkip("set IPODFW_IPSW") }
+        let stock = try FirmwarePartition(data: IPSW.extractFirmware(URL(fileURLWithPath: path)).data).image("osos")
+        for name in ["Classic Dark", "Dark Gray"] {
+            let theme = try ImportedTheme.load(PatchAndArtTests.repo.appendingPathComponent("themes/\(name).ipodtheme"))
+            XCTAssertTrue(theme.edits.isEmpty, name)
+            XCTAssertNotNil(theme.changes.first { $0.resource == "BMap 24287" && $0.new.count > 1000 }, name)
+            var out = stock
+            let r = try theme.apply(to: &out, originalSHA256: theme.osos_sha256)
+            XCTAssertEqual(r.conflicts, 0, name)
+            let main = try Resources.mainBlock(Resources.scan(out, limit: Patcher.maxOSOSSize))
+            for (id, column) in [(24286, 9), (24287, 14)] {         // a pixel of the top ray: the column of the middle
+                let res = try XCTUnwrap(main.resources.first { $0.type == "BMap" && $0.id == Int16(id) })
+                let at = main.abs(res) + 28 + 2 * column               // the header has 28 bytes; row 0
+                let pixel = UInt16(out[at]) | UInt16(out[at + 1]) << 8   // ARGB4444, little-endian
+                XCTAssertEqual(pixel & 0x0FFF, 0x0FC3, "\(name) BMap \(id)")   // the colour (255, 204, 51)
+                XCTAssertNotEqual(pixel >> 12, 0, "\(name) BMap \(id)")         // not transparent
+            }
+        }
+    }
+}
+
+final class BatteryCurveTests: XCTestCase {
+    private func log(_ raws: [Int], charger: [Int] = []) -> String {
+        let all = charger + raws
+        let lines = all.enumerated().map { "\(60 + $0.offset * 300) \($0.element) 10 1" }
+        return (["BL01 0000000100 5 min", "start"] + lines).joined(separator: "\n")
+    }
+
+    /// The curve has 16 points, from 100 % to 0 %, and the raw values decrease.
+    func testCurveFromLog() throws {
+        let curve = try BatteryCurve.make(log: log(stride(from: 430, to: 130, by: -3).map { $0 }))
+        XCTAssertEqual(curve.raw.count, BatteryCurve.points)
+        XCTAssertEqual(curve.percent.first, 100)
+        XCTAssertEqual(curve.percent.last, 0)
+        XCTAssertEqual(curve.raw.last, 133)
+        XCTAssertEqual(zip(curve.raw, curve.raw.dropFirst()).filter { $0 <= $1 }.count, 0)
+        XCTAssertEqual(curve.hours, 99 * 300 / 3600, accuracy: 0.5)
+    }
+
+    /// A rise at the start (time on a charger) does not count as play time.
+    func testCurveStartsAtHighestValue() throws {
+        let curve = try BatteryCurve.make(log: log(stride(from: 430, to: 130, by: -3).map { $0 }, charger: [380, 400, 420, 430]))
+        XCTAssertGreaterThan(curve.raw[0], 420)
+    }
+
+    /// The longest run counts if the log has more than one start.
+    func testCurveUsesLongestRun() throws {
+        let text = log([400, 399]) + "\n" + log(stride(from: 430, to: 130, by: -3).map { $0 })
+        XCTAssertEqual(try BatteryCurve.make(log: text).raw.last, 133)
+    }
+
+    /// The build writes the imported curve into the two variables of the patch.
+    func testCurveGoesIntoPatch() throws {
+        let repo = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let all = Patcher.list(in: repo.appendingPathComponent("patches"))
+        let spec = try XCTUnwrap(all.first { $0.spec.name == "battery-display" }).spec
+        let curve = try BatteryCurve.make(log: log(stride(from: 430, to: 130, by: -3).map { $0 }))
+        var code = [UInt8](repeating: 0, count: 0x100)
+        try Patcher.setOptions(spec, values: [:], curve: curve, in: &code, base: 0x1000, symbols: [
+            "display_mode": 0x1000, "battery_data": 0x1004, "smoothing": 0x1008, "curve_raw": 0x1010, "curve_pct": 0x1030])
+        XCTAssertEqual(Int(code[0x10]) | Int(code[0x11]) << 8, curve.raw[0])
+        XCTAssertEqual(Int(code[0x4e]) | Int(code[0x4f]) << 8, 0)
+    }
+
+    func testCurveRefusesShortLogs() {
+        XCTAssertThrowsError(try BatteryCurve.make(log: log([430, 420, 410])))
+        XCTAssertThrowsError(try BatteryCurve.make(log: log(Array(repeating: 420, count: 50))))
+    }
+
+    /// The patch gives the text of the two battery Views the Type 24171 and a box inside the icon body,
+    /// and it hooks the 4 sites. The firmware stays the same in all other bytes of the text elements.
+    func testDisplayPutsTheTextInsideTheIcon() throws {
+        guard let ipsw = ProcessInfo.processInfo.environment["IPODFW_IPSW"] else { throw XCTSkip("set IPODFW_IPSW") }
+        let osos = try FirmwarePartition(data: IPSW.extractFirmware(URL(fileURLWithPath: ipsw)).data).image("osos")
+        let repo = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let patch = Patcher.list(in: repo.appendingPathComponent("patches")).filter { $0.spec.name == "battery-display" }
+        XCTAssertEqual(patch.count, 1)
+        let out = try Patcher.apply(patch, to: osos)
+        func word(_ image: [UInt8], _ at: Int) -> UInt32 { (0..<4).reduce(0) { $0 | UInt32(image[at + $1]) << UInt32(8 * $1) } }
+        for base in [0x4e4adc, 0x4e5628] {                       // the Str elements 0x63fc of Views 25598 and 25599
+            XCTAssertEqual(word(out, base + 84) >> 16, 24171)    // Pixo 7, bold, centred, black
+            XCTAssertEqual(word(osos, base + 84) >> 16, 24223)
+            XCTAssertEqual(word(out, base + 36), 1)              // the top edge: 1 pixel inside
+            XCTAssertEqual(word(out, base + 48), 2)              // the left edge: 2 pixels inside
+            XCTAssertEqual(word(out, base + 60), 0xFFFF_FFFD)    // the bottom edge: 3 pixels inside
+            XCTAssertEqual(word(out, base + 72), 0xFFFF_FFFB)    // the right edge: 5 pixels inside
+            for edge in [28, 40, 52, 64] {                        // the modes of the 4 edges stay "parent"
+                XCTAssertEqual(word(out, base + edge + 4), 0x8000_0002)
+            }
+        }
+        // No font record changes. Version 0.5 changed the size of a Podium Sans Type to 9, and the iPod restarted.
+        for block in Resources.scan(osos) {
+            for type in block.ofType("Type") {
+                let at = block.abs(type)
+                XCTAssertEqual(Array(out[at..<at + Int(type.size)]), Array(osos[at..<at + Int(type.size)]), "Type \(type.id)")
+            }
+        }
+        for at in [0xb4abc, 0x1e8af8, 0x1ae838, 0x1ae6b8] {
+            XCTAssertEqual(word(out, at) & 0xFF00_0000, 0xEB00_0000)
+            XCTAssertNotEqual(word(out, at), word(osos, at))
+        }
+        // The two dark themes write the colours of the same elements. The patch still builds after them.
+        for name in ["Classic Dark", "Dark Gray"] {
+            var themed = osos
+            try ImportedTheme.load(repo.appendingPathComponent("themes/\(name).ipodtheme"))
+                .apply(to: &themed, originalSHA256: ThemeImport.sha256(osos))
+            let built = try Patcher.apply(patch, to: themed, originalSHA256: ThemeImport.sha256(osos))
+            XCTAssertEqual(word(built, 0x4e5628 + 84) >> 16, 24171, name)
         }
     }
 }

@@ -54,7 +54,11 @@ public struct PatchCode: Equatable {
             if let c = h.chain_default { d["chain_default"] = c }
             return d
         }
-        let byteList: [Any] = bytes.map { ["at": $0.at, "expect": $0.expect, "value": $0.value] }
+        let byteList: [Any] = bytes.map { b -> [String: Any] in
+            var d: [String: Any] = ["at": b.at, "expect": b.expect, "value": b.value]
+            if let a = b.also_expect, !a.isEmpty { d["also_expect"] = a }
+            return d
+        }
         func keep(_ value: Any, empty: Bool, _ keepEmpty: Bool) -> Any { empty && !keepEmpty ? NSNull() : value }
         return ["symbols": keep(symbolMap, empty: syms.isEmpty, isCode),
                 "hooks": keep(hookList, empty: hooks.isEmpty, isCode),
@@ -118,7 +122,7 @@ extension PatchLibrary {
                 r.errors.append("\(n): \"expect\" and \"value\" must be hexadecimal bytes, for example 0100.")
             } else if expect!.count != value!.count {
                 r.errors.append("\(n): \"expect\" and \"value\" must have the same number of bytes.")
-            } else if let osos, let have = PatchCode.bytes(at: b.at, count: expect!.count, in: osos), have != b.expect.lowercased() {
+            } else if let osos, let have = PatchCode.bytes(at: b.at, count: expect!.count, in: osos), have != b.expect.lowercased(), !(b.also_expect ?? []).contains(where: { $0.lowercased() == have }) {
                 r.errors.append("\(n): the open firmware has \(have) at \(b.at), not \(b.expect).")
             }
         }

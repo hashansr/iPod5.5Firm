@@ -118,6 +118,9 @@ The table shows the status that the test notes record. For the full test record,
 | Custom EQ | q | Adds up to 5 of your own named EQs to Settings > EQ, with 3 bands, or 5 after a warning. You set the bands in the app, and you can share them as a `.ipodeq` file. | Yes. Version 0.1 operates. Version 0.2 and later are not tested. |
 | Album Mix Shuffle | x | Adds Album Mix to Settings > Shuffle: the albums and the songs in each album play in a random order. Settings > Main Menu > Shuffle adds a main menu item that changes the Shuffle value. It needs Shuffle Fixes, and the app turns on Shuffle Fixes with it. | Yes (version 1.2) |
 | USB-C Audio | u | Plays the music through USB-C headphones. Refer to [USB-C Audio](#usb-c-audio). | Yes (version 1.9) |
+| Battery Display | t | A test patch. It shows the percentage inside the battery icon, below 100 %. It can use Apple data or a curve from a larger battery. The options are in the Patches pane. Turn on Enable Test Patches to see it. | Versions 0.3 to 0.7: partly. Version 0.5: failed. Version 0.11: yes |
+| Wheel Wake Guard | g | A test patch. When the screen light is off, the wheel does nothing until you push a button. Settings > Wheel Guard turns it On or Off on the iPod. Turn on Enable Test Patches to see it. | Version 0.1: yes. Version 0.2: not tested |
+| Volume Number | e | A test patch. The volume bar shows the volume as a number from 0 to 100. Turn on Enable Test Patches to see it. | Version 0.11: yes |
 
 ### The space for patches
 

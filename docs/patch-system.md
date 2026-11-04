@@ -114,7 +114,7 @@ The detail of a user patch has a Code section (`PatchCodeSections` in [PatchCode
 | C Code | The C file of the patch. Only for a patch with a C file. | The C file |
 | Firmware Functions | A name and an osos offset for each firmware function or data that the C code declares. | `symbols` |
 | Hooks | The kind, `at`, `expect` and `to` of each hook. The menu at `to` shows the global functions of the code after a check. | `hooks` |
-| Byte Changes | `at`, `expect` and `value` of each byte change. | `bytes` |
+| Byte Changes | `at`, `expect` and `value` of each byte change. A change can also have `also_expect`: a list of other bytes that the firmware can have at `at`, for example after a dark look. | `bytes` |
 
 The code editor (`CodeTextView`) does not change quotes, dashes or spelling. The SwiftUI text editor changes `"` into curly quotes, and the compiler then refuses the code.
 
@@ -159,8 +159,10 @@ The changes stay in the app until Save or **Revert** (`AppModel.codeDrafts`), al
 | `caution` | string, optional | A caution. The pane shows it in orange above the switch of the patch. The install sheet also shows it. |
 | `symbol` | string | The name of an SF Symbol, for example `photo.on.rectangle.angled`. Do not use emoji. |
 | `category` | string | The group in the list of patches: `display`, `power`, `audio` (the group "Sound"), `playback` (the group "Playback", for example the shuffle), `fun` or `test`. The group "Community", at the end of the list, has each installed patch, whatever its `category` is. A newer copy of a built-in patch is an exception: it stays in the group of the built-in patch. A patch with no `category` or with a different value also goes into "Community" (`PatchList.isCommunity`). The groups are `PatchSpec.categories` ([Patcher.swift](../mac/Sources/IPodFWKit/Patcher.swift)); the names, the order and the colors are in `PatchList.groups` and `PatchInfo.tint` ([PatchesView.swift](../mac/Sources/iPodFirm/PatchesView.swift)). A `test` patch is a research patch: the app shows it only when Settings > Patches > Enable Test Patches is on, with a red warning, and a build includes it only then (`PatchSpec.isTest`, `PatchSpec.visible`, the test `testTestPatchesHidden`). |
+| `battery_curve` | object, optional | The variables `raw` and `percent` (each 16 `unsigned short` values). The app writes `PatchInfo.batteryCurve` into them after the link. The Python build keeps the values in the C file. |
 | `settings_items` | array, optional | On/Off items that the patch adds to the Settings menu. Refer to [Settings items](#settings-items). |
 | `menu_items` | array, optional | Copies of items that the patch adds to other menus, for example the Music menu. Refer to [Menu items](#menu-items). |
+| `view_elements` | array, optional | Elements that the patch adds to Views, for example a text on the volume bar. Refer to [View elements](#view-elements). |
 | `options` | array, optional | Choices that the owner makes in the Patches pane before a build. Refer to [Options](#options). |
 
 | `ui` | object, optional | Controls in the Patches pane. Refer to [The ui object](#the-ui-object). |
@@ -287,6 +289,26 @@ The patcher finds the menu through the resource table entry in the current image
 
 The settings object calls the "get" method (vtable 0x66c94c) for the value text and the "set" method (vtable 0x66c950) when the owner selects the item. A patch hooks both with `chain`. Use a key that is not in the firmware: 0x600060e0 is Dark Mode, and 0x600060e4 is `something-comforting`. The low 16 bits of a firmware key are a string ID of the firmware, and the Menu resources use many of them (for example 0x600060ec is Daylight Saving in Menu 24604). Make sure that no Menu resource has the key. A key in the string range of the patch (0x60007exx) cannot collide with the firmware. Do not use a label ID of the patch as the key (refer to [Menu items](#menu-items)).
 
+### View elements
+
+`view_elements` adds an element to a View. A View is a header (the count of elements, 4 bytes) and a list of elements, so a View with one more element has a different size. The patcher makes a new copy of the View with the new element, puts the copy after the end of the image (as it does for a menu), and changes the resource table entry (offset and size). The old View stays in the image. Each item has these keys:
+
+| Key | Content |
+|---|---|
+| `view_id` | The ID of the `View` resource, as a number, for example `24544`. |
+| `after` | The index of the element that comes before the new element (0 is the first element). |
+| `element` | The bytes of the new element in hexadecimal. The first 32-bit word is the size of the element minus 4. |
+
+An element that refers to "the previous element" in its edges (the modes 0x100 to 0x400 with the reference 0) refers to the element with the index `after`. The element after the new element then refers to the new element. Thus the new element can have the same rectangle as the previous element, and nothing else changes. Refer to [../re/home-screen.md](../re/home-screen.md#edge-format-of-a-view-element) for the edge format.
+
+The patcher stops with an error if the firmware has no such View, if `after` is not an index of the View, or if the element has a wrong size. Two patches that add an element after the same element of the same View are a conflict. `Patcher.spaceUse` counts the size of the new copy of the View.
+
+Limits:
+
+- The Dark Mode switch changes bytes of the old View. It does not change the copy. A new element thus has the colours of the appearance of the build. Use a style that is correct in each appearance, or only for one appearance.
+- A theme that changes the bytes of the View also changes the copy, because the patch copies the View after the theme.
+- The Python patcher (`patcher.py`) does not know `view_elements`.
+
 ### Menu items
 
 `menu_items` adds a copy of an item to a menu, for example the Music menu (Menu 24440). The copy does the action of the item that it copies. Each item has these keys:
@@ -368,6 +390,7 @@ Apple's code ends at 0x7358c0. The bytes `55 AA 55 AA` at 0x7358c0 are a marker.
 | `cover-flow` | `extended` | After all other data (11384 bytes; approximately 600 KB for the screen copy, the covers and the read buffer come from the allocator while Cover Flow shows) | Extended patch. |
 | `up-next` | `extended` | After all other data (1807 bytes), then the Settings menu (19 items, 764 bytes). Alone: code 0x736800–0x736f0f, menu at 0x736f10, osos end 0x737800 | Extended patch. |
 | `custom-eq` | `extended` | After all other data (1690 bytes, with 1000 bytes of filter records and 350 bytes for the list of EQs). | Extended patch. It also changes 2 words (`bytes`). |
+| `wheel-guard` | `extended` | After all other data (1115 bytes, with 12 bytes of variables), then the Settings menu (1 added item). | Extended patch. Hooks with `chain` on the slot 0x6701f0, the lookup 0x21f254 and the slots 0x66c94c and 0x66c950, after `cover-flow` and `up-next`. |
 
 The variables of a patch are in its area. The firmware loads osos into RAM, so the variables can change. Apple's code does not use this RAM.
 

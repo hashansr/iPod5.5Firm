@@ -18,8 +18,8 @@ GRID = {
 }
 # The hash of osos with Classic Dark and the accent. The Swift test (testClassicDarkWithAccent) has the same values.
 OSOS = {
-    "#ff3b30": "c289f447b1368471620a258fb3316623b6f3ac7190e9ca7b7d439dbc813dbe6c",
-    "#bf5af2": "d019d4a6eeaa2ebf96b062d62a1870634c8ac1d868eabd4296f27f054620ecab",
+    "#ff3b30": "cabcb0d1dec55550ec7257d0354935f0bd09459834a756a7647ca7149047dde3",
+    "#bf5af2": "3e42132052f359e70d4fb43e1fd35c401031d1bec3feffa2a292e617422f5924",
 }
 
 
