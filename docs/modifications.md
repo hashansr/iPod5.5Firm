@@ -24,9 +24,9 @@ All addresses are osos offsets for Apple firmware 1.3. Refer to [The address rul
 | [cover-flow](#cover-flow) | Code patch | Patches | 3 words (2 vtable slots and 1 literal) | Version 0.6.7: yes (27 October 2026). Version 0.6.8: yes (28 October 2026) |
 | [up-next](#up-next) | Code patch (extended) | Patches | 1 `bl`, 1 `b` and 2 vtable words (3 with `chain`), a Settings menu | Version 0.4: yes. Version 0.5: yes (28 October 2026) |
 | [custom-eq](#custom-eq) | Code patch (extended) | Patches | 1 `bl`, 1 `b`, 2 words (`bytes`) | Version 0.1: yes, a basic test by the owner. Version 0.2 and later: no |
-| [battery-display](#battery-display) | Code patch (test, extended) and data | Patches | 4 `bl` and 12 data changes | Version 0.3 and 0.4: partly (3 November 2026). Version 0.5: failed (the iPod restarted). Versions 0.6 to 0.10: start (0.8 to 0.10: white digits). Version 0.11: works |
-| [wheel-guard](#wheel-guard) | Code patch (test, extended) | Patches | 3 `word` and 1 `b` (all with `chain`), a Settings item | Version 0.1: yes (owner, 3 November 2026). Version 0.2: no |
-| [volume-number](#volume-number) | Code patch (test, extended), data and a View | Patches | 1 `bl`, 1 instruction word, 1 View element, 1 Type colour | Versions 0.1 to 0.4: partly. Versions 0.5 to 0.8: no. Version 0.9: the colour is known, the size is too large. Version 0.10: right size, but black. Version 0.11: works (owner, 4 November 2026) |
+| [battery-display](#battery-display) | Code patch (extended) and data | Patches | 4 `bl` and 12 data changes | Version 0.3 and 0.4: partly (3 November 2026). Version 0.5: failed (the iPod restarted). Versions 0.6 to 0.10: start (0.8 to 0.10: white digits). Version 0.11: works. Version 1.0: the same as 0.11 |
+| [wheel-guard](#wheel-guard) | Code patch (extended) | Patches | 3 `word` and 1 `b` (all with `chain`), a Settings item | Version 0.1: yes (owner, 3 November 2026). Version 1.0 (the Settings item): not tested |
+| [volume-number](#volume-number) | Code patch (extended), data and a View | Patches | 1 `bl`, 1 instruction word, 1 View element, 1 Type colour | Versions 0.1 to 0.4: partly. Versions 0.5 to 0.8: no. Version 0.9: the colour is known, the size is too large. Version 0.10: right size, but black. Version 0.11: works (owner, 4 November 2026) |
 | [usb-audio-out](#usb-audio-out) | Code patch | Patches | 17 `bl`, 2 `b` and 4 words (3 with `chain`), a Settings menu | Yes (2026-10-17) |
 | [Dark theme](#dark-theme) | Resource data | Patches > iPod Appearance | BMap, View and Type bytes | Yes |
 | [Dark Mode switch](#dark-mode-switch) | Code and data | Patches > iPod Appearance | 1 `b` and 2 vtable words, a compressed table and a menu | Version 1.1: yes (28 October 2026). Version 2.0: yes (3 November 2026). Accent colour: not tested on a real iPod |
@@ -853,7 +853,7 @@ Each active band of each EQ gets the next filter number (`CustomEQ.library`). 5 
 
 ## volume-number
 
-**User interface.** Patches pane > Volume Number, letter `e`, version 0.11 (a test version), 24 bytes. It is a test patch: turn on **Enable Test Patches** to see it. It has no option.
+**User interface.** Patches pane > Volume Number, letter `e`, version 1.0, 24 bytes. It has no option.
 
 **Effect.** The volume bar of Now Playing shows the volume as a white number from 0 to 100, in the middle of the bar, in Podium Sans 16 (bold). The number changes while the owner turns the wheel.
 
@@ -882,7 +882,7 @@ Each active band of each EQ gets the next filter number (`CustomEQ.library`). 5 
 
 ## wheel-guard
 
-**User interface.** Patches pane > Wheel Wake Guard, letter `g`, version 0.2, 1115 bytes. It is a test patch: turn on **Enable Test Patches** to see it. It has no option in the app. On the iPod, Settings > Wheel Guard (after Clicker) turns the guard On or Off. A selection of the item changes the value.
+**User interface.** Patches pane > Wheel Wake Guard, letter `g`, version 1.0, 1115 bytes. It has no option in the app. On the iPod, Settings > Wheel Guard (after Clicker) turns the guard On or Off. A selection of the item changes the value.
 
 **Effect.** When the screen light is off, the wheel does nothing until the owner pushes a button. The time of the screen light is the time of Settings > Backlight Timer. The buttons operate as before. With Backlight Timer Off or Always On, or with Wheel Guard Off, the patch does nothing.
 
@@ -910,11 +910,11 @@ Each active band of each EQ gets the next filter number (`CustomEQ.library`). 5 
 
 **Limits.** The screen light can still come on at a touch of the wheel. The timer wraps after 71 minutes, and then the wheel works until the next push.
 
-**Test status.** Swift tests (3 November 2026), with the real firmware: the slot points to the hook, the guard chains to `cover-flow`, and the Settings menu has the key after Clicker together with the item of `up-next`. Real iPod, version 0.1 (the owner, 3 November 2026): the guard works. Version 0.2 (the Settings item): not tested on a real iPod.
+**Test status.** Swift tests (3 November 2026), with the real firmware: the slot points to the hook, the guard chains to `cover-flow`, and the Settings menu has the key after Clicker together with the item of `up-next`. Real iPod, version 0.1 (the owner, 3 November 2026): the guard works. Version 0.2 (the Settings item): not tested on a real iPod. Version 1.0 has the code of version 0.2 and is no longer a test patch.
 
 ## battery-display
 
-**User interface.** Patches pane > Battery Display, letter `t`, version 0.11. It is a test patch: turn on **Enable Test Patches** to see it. The option "Display" gives Icon or Icon + Percent (the default). The option "Battery Data" gives Apple or Custom Battery. The option "Smoothing" gives Off (the default) or On. The tool `battery-curve` gives the section "Battery Curve": **Import Log File…** and **Use the Built-In Curve**. This fork does not have the patch `battery-log`. Thus the log file comes from the `upstream/battery-display` branch, or from an earlier log. To change an option or the curve, flash the iPod again.
+**User interface.** Patches pane > Battery Display, letter `t`, version 1.0. The option "Display" gives Icon or Icon + Percent (the default). The option "Battery Data" gives Apple or Custom Battery. The option "Smoothing" gives Off (the default) or On. The tool `battery-curve` gives the section "Battery Curve": **Import Log File…** and **Use the Built-In Curve**. This fork does not have the patch `battery-log`. Thus the log file comes from the `upstream/battery-display` branch, or from an earlier log. To change an option or the curve, flash the iPod again.
 
 **Effect.** The status bar shows the Apple battery icon. Below 100 %, the percentage shows inside the icon. At 100 %, the iPod shows only the Apple picture of a full battery. The text uses the Pixo font, size 7, bold and centred, in the middle of the icon body. It is black and has no "%" sign. The icon pictures are the Apple pictures, with no change. The icon body is light in the Apple look, in Classic Dark and in Dark Gray. Thus the black text is easy to read in each look. During a charge, the iPod shows the Apple charge icon with no percentage. With Custom Battery, the battery picture and the percentage use a curve from a larger battery. The firmware logic for a low battery does not change.
 

@@ -1,11 +1,11 @@
 {
   "name": "battery-display",
   "title": "Battery Display",
-  "summary": "Test patch: the percentage inside the battery icon",
+  "summary": "Shows the battery percentage in the battery icon.",
   "symbol": "battery.75percent",
-  "category": "test",
+  "category": "display",
   "version_letter": "t",
-  "version": "0.11",
+  "version": "1.0",
   "size": 3436,
   "description": "The battery icon stays. Below 100 %, the percentage shows inside it. At 100 %, the iPod shows the Apple picture of a full battery. The patch can also use a curve from a larger battery in place of the Apple table.",
   "details": [

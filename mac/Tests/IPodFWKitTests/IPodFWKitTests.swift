@@ -626,7 +626,7 @@ final class PatchAndArtTests: XCTestCase {
         XCTAssertEqual(le32(out, 0x21f254) & 0xFF00_0000, 0xEA00_0000)       // the lookup is a branch to the hook
     }
 
-    /// The volume-number patch: 2 changed tests of the switch byte, 2 hooks for the number, and a new copy of View 24544 with a text element
+    /// The volume-number patch: the changed test of the switch byte, the hook for the number, the white Type 24227, and a new copy of View 24544 with a text element
     /// (ID 0x63ef) after the slider. The table entry points to the copy. The old View stays.
     func testVolumeNumberAddsTheText() throws {
         guard let ipsw = ProcessInfo.processInfo.environment["IPODFW_IPSW"] else { throw XCTSkip("set IPODFW_IPSW") }

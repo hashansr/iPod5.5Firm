@@ -1,11 +1,11 @@
 {
   "name": "volume-number",
   "title": "Volume Number",
-  "summary": "Test patch: the volume as a number.",
+  "summary": "Shows the volume as a number on the volume bar.",
   "symbol": "speaker.wave.2",
-  "category": "test",
+  "category": "display",
   "version_letter": "e",
-  "version": "0.11",
+  "version": "1.0",
   "size": 24,
   "description": "The volume bar of Now Playing shows the volume as a white number from 0 to 100, in the middle of the bar.",
   "details": [
@@ -15,7 +15,7 @@
     "The colour of a text comes from its Type record when the flag byte + 92 is 0x0c. Type 24227 (Podium Sans 16, bold, centred) is black in Apple's firmware, and no stock View uses it. This patch makes its colour white."
   ],
   "notes": [
-    "This is a test version. White is easy to read on the blue part of the bar. On the light grey part (a low volume), it is not as easy to read.",
+    "White is easy to read on the blue part of the bar. On the light grey part (a low volume), it is not as easy to read.",
     "The patch puts a new copy of View 24544 in the free space of the firmware, with the new element. With Switch on iPod and a dark theme, the copy does not switch with the other Views, so the number is white in each look.",
     "With the Apple limit of the volume of the EU (no volume-unlimit patch), the highest volume shows as 84."
   ],

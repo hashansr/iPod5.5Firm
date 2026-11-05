@@ -3,9 +3,9 @@
   "title": "Wheel Wake Guard",
   "summary": "The wheel waits for a button, in Settings.",
   "symbol": "hand.raised",
-  "category": "test",
+  "category": "power",
   "version_letter": "g",
-  "version": "0.2",
+  "version": "1.0",
   "size": 1115,
   "description": "When the screen light is off, the wheel does nothing until you push a button. Settings > Wheel Guard turns it On or Off.",
   "details": [
@@ -16,7 +16,7 @@
     "With Backlight Timer set to Off or to Always On, the patch does nothing."
   ],
   "notes": [
-    "The wheel guard works on a real iPod (owner, 3 November 2026, version 0.1). The Settings item is not tested.",
+    "The wheel guard works on a real iPod (owner, 3 November 2026, version 0.1). The Settings item of version 0.2 is not tested on a real iPod yet.",
     "The screen light can still come on at a touch of the wheel. The patch stops only the action of the wheel.",
     "The time starts at the last button push or wheel movement that the iPod accepted.",
     "The text \"Wheel Guard\" is in English for all languages. On and Off use the text of the Apple firmware."
