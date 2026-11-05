@@ -129,7 +129,7 @@ A FLAC file at 88.2 kHz or 96 kHz needs a conversion to 44.1 kHz or 48 kHz. The 
 1. Find who uses the IRAM methods of the MP3 class (0x40008c50, 0x40008cec). Find the callers of the AIFF and M4A methods (0x1a1e88, 0x1a1e90, 0x1ff10c, 0x1ff144, 0x1ff1a4).
 2. Find the object at `pipeline + 0x78` (command 0x10 and 0x11). Find where it is set.
 3. Find the callers that send the commands 0xd, 0xe, 0x10 and 0x11 to message queue 2.
-4. Test a file with an unknown extension on the emulator. Look at the cache and at the error code of 0x10b894.
+4. Test a file with an unknown extension on the emulator. Look at the cache and at the error code of 0x10b894. The recipe is in [flac-emulator-recipe.md](flac-emulator-recipe.md).
 3. Open 0x18b148, 0x1a1af8 and 0x1fef54 in Ghidra. Find out what they read.
 4. Find the reader of the file type in the track record (mhod type 6) and the check that hides unknown formats.
 5. Repeat the results of this note in Ghidra. Then update [../docs/firmware-functions.md](../docs/firmware-functions.md).
