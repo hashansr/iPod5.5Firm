@@ -16,9 +16,10 @@ The addresses are offsets in the osos image. The CPU address of the code is the 
 
 1. Firmware 1.3 selects a format class from the file extension. The function is at 0x1e738c.
 2. The firmware has 3 format classes: MP3, AIFF and M4A. Each class has its own vtable. WAV and Audible do not use this function.
-3. The MP3 and AAC decoders run as tasks. Their code, stacks and objects are in IRAM (0x40000000 and up).
-4. The audio engine has a command switch with 55 entries at 0x24addc.
-5. The research has not yet found where playback selects a decoder. This is the next step.
+3. The track cache uses these classes to find the audio data in a file. The research did not show that they select the decoder.
+4. The MP3 and AAC decoders run as tasks. Their code, stacks and objects are in IRAM (0x40000000 and up).
+5. The audio engine has a command switch with 55 entries at 0x24addc.
+6. The research has not yet found where playback selects a decoder. This is the next step.
 
 ## The extension table
 
@@ -50,7 +51,7 @@ The function 0x1e738c has the arguments (unused, path, out). It writes a kind to
 
 ## The one caller
 
-The function 0x101814 is the only caller of 0x1e7514 (at 0x101850).
+The function 0x101814 is the only caller of 0x1e7514 (at 0x101850). The only caller of 0x101814 is 0xe1ff0, in the method 0xe1dbc of `TrackCacheReadTask` ([firmware-media.md](firmware-media.md)). Evidence: Ghidra.
 
 1. It makes the block of three objects (0x1e7574).
 2. It gets the object for the path at `this + 0x4c`.
@@ -59,7 +60,12 @@ The function 0x101814 is the only caller of 0x1e7514 (at 0x101850).
 5. If the second result is not 0, it sends the event 0x63800032 (call to 0x1300f4).
 6. It destroys the block (0x1e7594).
 
-The meaning of the two results is not known. The function reads information from a file. It is possibly not the playback path.
+The task 0xe1dbc reads the file of a cache entry in blocks of at most 0x1e000 bytes. It opens the file (0xa449c) when the handle is -1. If the flag at `entry + 0x170` is set, it calls 0x101814.
+
+- The two results are probably the start and the size of the audio data. The cache can then skip the tags. This is not proved.
+- For an unknown extension, 0x101814 does nothing. The two values stay 0, as the function sets them at the start.
+- A FLAC file has thus probably no need of a change in this path. The cache would read the whole file. Test this on the emulator.
+- This path does **not** select the decoder.
 
 ## Decoders in IRAM
 
@@ -91,9 +97,11 @@ The strings `mp3dec_sync` (0x25dbd0) and `mp4_aacdec_sync` (0x25e418) are names 
 | 0x10, 0x11 | `0x23f178(engine + 0x2e5c)`, which returns `pipeline + 0x78` | 2 | Ghidra |
 
 - All four commands write the source object to `engine + 0x1950`. They copy the arguments to `engine + 0x1958` and up.
-- The slots A and B are probably the current song and the next song for gapless play. This is not proved.
+- The engine task entry writes the two slots as fixed RAM objects: slot A at 0x149e37e4 and slot B at 0x149e3780 (100 bytes lower). The code is at 0x2492b4 and the objects are made at 0x25d8c4. Evidence: Static.
+- Slot A has the vtable 0x666c80 and four more vtables at +0x74, +0x20c, +0x214 and +0x21c. Slot B has the vtable 0x668664. Both use the base constructor 0x163f98 and the methods 0x163dc8 and 0x163eec.
+- The methods of the two slots use view geometry, a mailbox and a callback. They look like event or user interface objects, **not** like decoders. Evidence: Ghidra.
 - The function 0x249f48 sends an event to a queue. The function 0x249fe4 stops the pipeline and clears flags.
-- The commands do not take a file extension or a codec name. The decoder is thus probably part of the source object. The code that makes the objects is not yet found.
+- The commands do not take a file extension or a codec name. The place where the decoder is selected is thus not in these four commands.
 
 ## Other facts for the FLAC patch
 
@@ -111,15 +119,17 @@ A FLAC file at 88.2 kHz or 96 kHz needs a conversion to 44.1 kHz or 48 kHz. The 
 ## Open questions
 
 1. Where does playback select the decoder for a track? The research found the format classes, but not the link from a track to the decoder task.
-2. What do the two results of 0x145834 mean?
+2. Does a format class (MP3, AIFF or M4A) also decode? The MP3 vtable has the IRAM methods 0x40008c50 and 0x40008cec. The other two have methods in osos.
 3. Does the check of the supported formats occur when the database loads, or when the song starts?
 4. How do ALAC, AIFF and WAV decode? They have no named decoder task.
 5. Does the Broadcom chip take part in the audio decode? The note [firmware-media.md](firmware-media.md) says that the protocol is the same for audio and video.
 
 ## Next steps
 
-1. Find the code that writes `engine + 0x1968` and `engine + 0x196c`. Find the classes of these source objects.
-2. Find the callers that send the commands 0xd, 0xe, 0x10 and 0x11 to message queue 2.
+1. Find who uses the IRAM methods of the MP3 class (0x40008c50, 0x40008cec). Find the callers of the AIFF and M4A methods (0x1a1e88, 0x1a1e90, 0x1ff10c, 0x1ff144, 0x1ff1a4).
+2. Find the object at `pipeline + 0x78` (command 0x10 and 0x11). Find where it is set.
+3. Find the callers that send the commands 0xd, 0xe, 0x10 and 0x11 to message queue 2.
+4. Test a file with an unknown extension on the emulator. Look at the cache and at the error code of 0x10b894.
 3. Open 0x18b148, 0x1a1af8 and 0x1fef54 in Ghidra. Find out what they read.
 4. Find the reader of the file type in the track record (mhod type 6) and the check that hides unknown formats.
 5. Repeat the results of this note in Ghidra. Then update [../docs/firmware-functions.md](../docs/firmware-functions.md).
