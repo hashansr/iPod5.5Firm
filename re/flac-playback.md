@@ -8,8 +8,9 @@ The addresses are offsets in the osos image. The CPU address of the code is the 
 
 - Firmware: `iPod_25.1.3.ipsw`, `Firmware-25.6.3`, osos size 0x736000 bytes.
 - Tools: `ipodfw` to extract osos, `strings`, and short Python scripts with Capstone (ARM mode, base address 0).
-- Evidence level: **Static**. The research did not use Ghidra, the emulator or a real iPod.
-- The scripts are not in the repository. Repeat each result in Ghidra before you copy it to [../docs/firmware-functions.md](../docs/firmware-functions.md).
+- Evidence level: **Static**. The research did not use the emulator or a real iPod.
+- Ghidra 12.1.4 confirmed the functions 0x1e738c, 0x145834 and 0x24addc (project `osos13`, language `ARM:LE:32:v4t`, base address 0). The evidence of these functions is **Ghidra**. The other results are still **Static**.
+- The scripts are not in the repository. Repeat each remaining result in Ghidra before you copy it to [../docs/firmware-functions.md](../docs/firmware-functions.md).
 
 ## Summary
 
@@ -78,7 +79,21 @@ The strings `mp3dec_sync` (0x25dbd0) and `mp4_aacdec_sync` (0x25e418) are names 
 - The function 0x24ab48 is the decoder step ([custom-eq.md](custom-eq.md)). It gives each output buffer to the object at `state + 0x909c`.
 - This object is a static C++ object at 0x149cb1ac. It is the output side. It is **not** a codec. The pointer comes from `object + 0x44` and is written at 0x2407d0.
 - The command switch of the engine is at 0x24addc. It has 55 entries (command 0 to 0x36). The jump table is at 0x24ae34. The default case is 0x24b328.
-- The task creation, the engine constructor (0x24b6e0 and up) and the command handlers are not yet read.
+- The command is the byte at `engine + 0x12f8`. The arguments are at `engine + 0x12fc` and up.
+- The task creation and the engine constructor (0x24b6e0 and up) are not yet read.
+
+### The play commands
+
+| Command | Source object | Byte `engine + 0x1954` | Evidence |
+|---|---|---|---|
+| 0xd | `*(engine + 0x196c)` (slot A) | 0 | Ghidra |
+| 0xe | `*(engine + 0x1968)` (slot B) | 1 | Ghidra |
+| 0x10, 0x11 | `0x23f178(engine + 0x2e5c)`, which returns `pipeline + 0x78` | 2 | Ghidra |
+
+- All four commands write the source object to `engine + 0x1950`. They copy the arguments to `engine + 0x1958` and up.
+- The slots A and B are probably the current song and the next song for gapless play. This is not proved.
+- The function 0x249f48 sends an event to a queue. The function 0x249fe4 stops the pipeline and clears flags.
+- The commands do not take a file extension or a codec name. The decoder is thus probably part of the source object. The code that makes the objects is not yet found.
 
 ## Other facts for the FLAC patch
 
@@ -103,8 +118,8 @@ A FLAC file at 88.2 kHz or 96 kHz needs a conversion to 44.1 kHz or 48 kHz. The 
 
 ## Next steps
 
-1. Read the command cases of 0x24addc. Find the case that starts a song and takes a format.
-2. Find the callers that send these commands to message queue 2.
+1. Find the code that writes `engine + 0x1968` and `engine + 0x196c`. Find the classes of these source objects.
+2. Find the callers that send the commands 0xd, 0xe, 0x10 and 0x11 to message queue 2.
 3. Open 0x18b148, 0x1a1af8 and 0x1fef54 in Ghidra. Find out what they read.
 4. Find the reader of the file type in the track record (mhod type 6) and the check that hides unknown formats.
 5. Repeat the results of this note in Ghidra. Then update [../docs/firmware-functions.md](../docs/firmware-functions.md).
